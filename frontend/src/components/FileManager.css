@@ -1,0 +1,234 @@
+.enhanced-file-manager {
+  padding: 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+}
+
+.file-manager-card {
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: none;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+/* 工具栏样式 */
+.toolbar-section {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+}
+
+/* 上传区域 */
+.upload-section {
+  margin-bottom: 24px;
+}
+
+.upload-dragger {
+  border: 2px dashed #d9d9d9;
+  border-radius: 8px;
+  background: #fafafa;
+  transition: all 0.3s;
+}
+
+.upload-dragger:hover {
+  border-color: #1890ff;
+  background: #f0f8ff;
+}
+
+.upload-content {
+  padding: 40px 0;
+}
+
+.upload-icon {
+  font-size: 48px;
+  color: #1890ff;
+  margin-bottom: 16px;
+}
+
+.upload-text {
+  font-size: 16px;
+  color: #666;
+}
+
+.upload-hint {
+  font-size: 12px;
+  color: #999;
+  margin-top: 8px;
+}
+
+.upload-progress {
+  margin-top: 16px;
+  text-align: center;
+}
+
+/* 文件列表 */
+.file-list-section {
+  min-height: 400px;
+}
+
+.file-count {
+  margin-bottom: 16px;
+  color: #666;
+  font-size: 14px;
+}
+
+.file-grid {
+  margin-top: 16px;
+}
+
+.file-card {
+  background: white;
+  border: 2px solid #f0f0f0;
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+}
+
+.file-card:hover {
+  border-color: #1890ff;
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.file-card.selected {
+  border-color: #52c41a;
+  background: #f6ffed;
+}
+
+.file-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.file-header .anticon {
+  font-size: 24px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.file-name {
+  flex: 1;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-selection {
+  margin-left: 8px;
+  font-size: 14px;
+}
+
+.file-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.file-meta {
+  flex: 1;
+}
+
+.file-size {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.file-date {
+  font-size: 10px;
+  color: #999;
+}
+
+.file-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.file-actions .ant-btn {
+  padding: 4px;
+  height: auto;
+}
+
+/* 空状态和加载状态 */
+.empty-state, .loading-state {
+  text-align: center;
+  padding: 80px 0;
+  color: #999;
+}
+
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-text {
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+
+.empty-hint {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+.loading-state .ant-spin {
+  margin-bottom: 16px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .enhanced-file-manager {
+    padding: 16px;
+  }
+  
+  .toolbar-section {
+    padding: 12px;
+  }
+  
+  .file-card {
+    padding: 12px;
+  }
+}
+
+/* 选择动画 */
+.file-card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.file-card.selected::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  border: 2px solid #52c41a;
+  border-radius: 14px;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(82, 196, 26, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(82, 196, 26, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(82, 196, 26, 0);
+  }
+}
