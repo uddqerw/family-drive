@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Button, Upload, message, Card,
-  Row, Col, Tag, Progress
+  Row, Col, Tag, Progress, Alert
 } from 'antd';
 import {
   UploadOutlined, DownloadOutlined, DeleteOutlined,
@@ -34,6 +34,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
   const [files, setFiles] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
+  const [downloadStatus, setDownloadStatus] = useState<{show: boolean, type: 'success' | 'error' | 'loading', filename: string} | null>(null);
 
   // 获取文件图标
   const getFileIcon = (filename: string) => {
@@ -78,60 +79,60 @@ const FileManager: React.FC<FileManagerProps> = () => {
     return false;
   };
 
-  // 文件下载 - 确保提示显示
+  // 文件下载 - 终极解决方案：使用 Alert 组件
   const handleDownload = async (filename: string) => {
     console.log('🚀 开始下载:', filename);
     setDownloading(filename);
     
-    // 显示开始下载提示
-    message.loading({
-      content: `📥 准备下载: ${filename}`,
-      key: 'download',
-      duration: 0, // 持续显示
+    // 方法1：使用 Alert 组件显示状态（绝对可见）
+    setDownloadStatus({
+      show: true,
+      type: 'loading',
+      filename: filename
     });
 
     try {
-      // 短暂延迟确保用户看到提示
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
       const response = await fileAPI.download(filename);
       
-      // 更新提示为下载中
-      message.loading({
-        content: `📥 下载中: ${filename}`,
-        key: 'download',
-        duration: 0,
-      });
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
+      // 创建下载
+      const blob = new Blob([response.data]);
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
-      link.remove();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
       
-      // 清理URL对象
-      setTimeout(() => window.URL.revokeObjectURL(url), 100);
-      
-      // 下载完成 - 显示成功提示
-      message.success({
-        content: `✅ 下载完成: ${filename}`,
-        key: 'download',
-        duration: 3,
+      // 显示成功状态
+      setDownloadStatus({
+        show: true,
+        type: 'success',
+        filename: filename
       });
       
       console.log('✅ 下载完成:', filename);
       
+      // 3秒后自动隐藏成功提示
+      setTimeout(() => {
+        setDownloadStatus(null);
+      }, 3000);
+      
     } catch (error: any) {
       console.error('❌ 下载失败:', error);
       
-      // 下载失败提示
-      message.error({
-        content: `❌ 下载失败: ${filename}`,
-        key: 'download',
-        duration: 3,
+      // 显示错误状态
+      setDownloadStatus({
+        show: true,
+        type: 'error', 
+        filename: filename
       });
+      
+      // 5秒后自动隐藏错误提示
+      setTimeout(() => {
+        setDownloadStatus(null);
+      }, 5000);
     } finally {
       setDownloading(null);
     }
@@ -168,6 +169,39 @@ const FileManager: React.FC<FileManagerProps> = () => {
         }
         className="file-manager-card"
       >
+        {/* 下载状态提示 - 绝对可见 */}
+        {downloadStatus?.show && (
+          <div style={{ marginBottom: 16 }}>
+            {downloadStatus.type === 'loading' && (
+              <Alert
+                message={`📥 正在下载: ${downloadStatus.filename}`}
+                type="info"
+                showIcon
+                closable
+                onClose={() => setDownloadStatus(null)}
+              />
+            )}
+            {downloadStatus.type === 'success' && (
+              <Alert
+                message={`✅ 下载完成: ${downloadStatus.filename}`}
+                type="success"
+                showIcon
+                closable
+                onClose={() => setDownloadStatus(null)}
+              />
+            )}
+            {downloadStatus.type === 'error' && (
+              <Alert
+                message={`❌ 下载失败: ${downloadStatus.filename}`}
+                type="error"
+                showIcon
+                closable
+                onClose={() => setDownloadStatus(null)}
+              />
+            )}
+          </div>
+        )}
+
         {/* 上传区域 */}
         <div className="upload-section">
           <Upload.Dragger
