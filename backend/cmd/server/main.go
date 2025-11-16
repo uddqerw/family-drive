@@ -56,7 +56,7 @@ func main() {
 	mux.HandleFunc("/api/files/download/", corsMiddleware(handlers.HandleFileDownload))
 	mux.HandleFunc("/api/files/delete/", corsMiddleware(handlers.HandleFileDelete))
 
-	addr := ":8000"
+	addr := "0.0.0.0:8000"
 	if v := os.Getenv("FAMILYDRIVE_ADDR"); v != "" {
 		addr = v
 	}
