@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Button, Upload, message, Card,
-  Row, Col, Tag, Progress, Modal
+  Row, Col, Tag, Progress
 } from 'antd';
 import {
   UploadOutlined, DownloadOutlined, DeleteOutlined,
@@ -33,6 +33,7 @@ interface FileManagerProps {
 const FileManager: React.FC<FileManagerProps> = () => {
   const [files, setFiles] = useState<any[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   // 获取文件图标
   const getFileIcon = (filename: string) => {
@@ -77,17 +78,31 @@ const FileManager: React.FC<FileManagerProps> = () => {
     return false;
   };
 
-  // 文件下载 - 带完整提示版本
+  // 文件下载 - 确保提示显示
   const handleDownload = async (filename: string) => {
-    // 开始下载提示
+    console.log('🚀 开始下载:', filename);
+    setDownloading(filename);
+    
+    // 显示开始下载提示
     message.loading({
-      content: `📥 开始下载: ${filename}`,
+      content: `📥 准备下载: ${filename}`,
       key: 'download',
-      duration: 0, // 持续显示直到手动关闭
+      duration: 0, // 持续显示
     });
 
     try {
+      // 短暂延迟确保用户看到提示
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
       const response = await fileAPI.download(filename);
+      
+      // 更新提示为下载中
+      message.loading({
+        content: `📥 下载中: ${filename}`,
+        key: 'download',
+        duration: 0,
+      });
+
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -96,51 +111,46 @@ const FileManager: React.FC<FileManagerProps> = () => {
       link.click();
       link.remove();
       
-      // 下载完成提示
+      // 清理URL对象
+      setTimeout(() => window.URL.revokeObjectURL(url), 100);
+      
+      // 下载完成 - 显示成功提示
       message.success({
         content: `✅ 下载完成: ${filename}`,
         key: 'download',
+        duration: 3,
       });
       
-      console.log(`✅ 文件下载完成: ${filename}`);
+      console.log('✅ 下载完成:', filename);
       
     } catch (error: any) {
+      console.error('❌ 下载失败:', error);
+      
       // 下载失败提示
       message.error({
         content: `❌ 下载失败: ${filename}`,
         key: 'download',
+        duration: 3,
       });
-      
-      console.error('下载失败详情:', error);
+    } finally {
+      setDownloading(null);
     }
   };
 
-  // 文件删除 - 美化提示版本
+  // 文件删除
   const handleDelete = async (filename: string) => {
-    Modal.confirm({
-      title: '🗑️ 确认删除文件',
-      content: (
-        <div>
-          <p>确定要删除文件 <strong>"{filename}"</strong> 吗？</p>
-          <p style={{ color: '#ff4d4f', fontSize: '12px' }}>
-            此操作不可撤销，文件将永久删除
-          </p>
-        </div>
-      ),
-      okText: '确认删除',
-      okType: 'danger',
-      cancelText: '取消',
-      icon: <DeleteOutlined />,
-      onOk: async () => {
-        try {
-          await fileAPI.delete(filename);
-          message.success(`✅ 文件 "${filename}" 已删除`);
-          await loadFiles();
-        } catch (error) {
-          message.error('文件删除失败');
-        }
-      },
-    });
+    if (!window.confirm(`确定要删除文件 "${filename}" 吗？此操作不可撤销。`)) {
+      return;
+    }
+
+    try {
+      await fileAPI.delete(filename);
+      message.success(`✅ 文件 "${filename}" 删除成功`);
+      await loadFiles();
+    } catch (error: any) {
+      console.error('删除失败:', error);
+      message.error('文件删除失败');
+    }
   };
 
   useEffect(() => {
@@ -211,6 +221,8 @@ const FileManager: React.FC<FileManagerProps> = () => {
                           icon={<DownloadOutlined />}
                           onClick={() => handleDownload(file.name)}
                           title="下载"
+                          loading={downloading === file.name}
+                          disabled={!!downloading}
                         />
                         <Button
                           type="link"
@@ -218,6 +230,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
                           icon={<DeleteOutlined />}
                           onClick={() => handleDelete(file.name)}
                           title="删除"
+                          disabled={!!downloading}
                         />
                       </div>
                     </div>
