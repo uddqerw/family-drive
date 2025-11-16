@@ -47,37 +47,12 @@ func corsMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// 模拟认证API
-func handleLogin(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	response := map[string]interface{}{
-		"access_token": "mock-token-" + fmt.Sprintf("%d", time.Now().Unix()),
-		"user": map[string]interface{}{
-			"id":    1,
-			"email": "family@example.com",
-		},
+func loggingMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		next(w, r)
+		log.Printf("%s %s %v", r.Method, r.URL.Path, time.Since(start))
 	}
-	json.NewEncoder(w).Encode(response)
-}
-
-// 模拟文件列表API
-func handleFileList(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	files := []map[string]interface{}{
-		{
-			"name":      "family-photo.jpg",
-			"size":      2048576,
-			"uploadTime": time.Now().Add(-24 * time.Hour).Format(time.RFC3339),
-		},
-		{
-			"name":      "document.pdf",
-			"size":      1048576,
-			"uploadTime": time.Now().Add(-12 * time.Hour).Format(time.RFC3339),
-		},
-	}
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"data": files,
-	})
 }
 
 // 聊天API - 获取消息
@@ -148,6 +123,41 @@ func handleChatSend(w http.ResponseWriter, r *http.Request) {
 	log.Printf("💬 新消息: %s: %s", request.Username, request.Content)
 }
 
+// 聊天API - 清除消息
+func handleChatClear(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "POST" {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	chatMutex.Lock()
+	// 清空消息但保留一条系统消息
+	chatMessages = []map[string]interface{}{}
+	messageID = 1
+	
+	// 添加一条新的系统消息
+	chatMessages = append(chatMessages, map[string]interface{}{
+		"id":        messageID,
+		"user_id":   1,
+		"username":  "🏠 家庭网盘",
+		"content":   "💬 聊天记录已清空，开始新的对话吧！",
+		"type":      "system",
+		"timestamp": time.Now().Format("2006-01-02 15:04:05"),
+	})
+	messageID++
+	chatMutex.Unlock()
+
+	response := map[string]interface{}{
+		"success": true,
+		"message": "聊天记录已清空",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+
+	log.Printf("🗑️ 聊天记录已清空")
+}
+
 // 健康检查
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	info := map[string]interface{}{
@@ -164,19 +174,17 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	// 设置路由
-	http.HandleFunc("/api/auth/login", corsMiddleware(handleLogin))
-	http.HandleFunc("/api/files/list", corsMiddleware(handleFileList))
-	http.HandleFunc("/api/chat/messages", corsMiddleware(handleChatMessages))
-	http.HandleFunc("/api/chat/send", corsMiddleware(handleChatSend))
-	http.HandleFunc("/", corsMiddleware(handleHealth))
+	http.HandleFunc("/api/chat/messages", corsMiddleware(loggingMiddleware(handleChatMessages)))
+	http.HandleFunc("/api/chat/send", corsMiddleware(loggingMiddleware(handleChatSend)))
+	http.HandleFunc("/api/chat/clear", corsMiddleware(loggingMiddleware(handleChatClear)))
+	http.HandleFunc("/", corsMiddleware(loggingMiddleware(handleHealth)))
 
 	port := ":8000"
 
 	fmt.Println("🚀 家庭网盘完整服务器启动成功!")
 	fmt.Println("📍 服务地址: http://localhost" + port)
-	fmt.Println("🔐 认证接口: http://localhost" + port + "/api/auth/login")
-	fmt.Println("📁 文件接口: http://localhost" + port + "/api/files/list")
 	fmt.Println("💬 聊天接口: http://localhost" + port + "/api/chat/messages")
+	fmt.Println("🗑️  清除聊天: http://localhost" + port + "/api/chat/clear")
 	fmt.Println("⏰ 启动时间:", time.Now().Format("2006-01-02 15:04:05"))
 	fmt.Println("==================================================")
 

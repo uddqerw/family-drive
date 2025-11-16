@@ -90,3 +90,21 @@
     padding: 12px;
   }
 }
+/* 空聊天状态 */
+.empty-chat-state {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  color: #999;
+}
+
+/* 清空按钮样式 */
+.clear-button {
+  transition: all 0.3s;
+}
+
+.clear-button:hover {
+  transform: scale(1.05);
+}
