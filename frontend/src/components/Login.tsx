@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Button, Form, Input, Card, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { authAPI } from '../services/api';
-import FileManager from './FileManager';
 
-const Login: React.FC = () => {
+// 定义props接口
+interface LoginProps {
+  children?: React.ReactNode;
+}
+
+const Login: React.FC<LoginProps> = (props) => {
   const [loading, setLoading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -40,9 +44,9 @@ const Login: React.FC = () => {
     }
   };
 
-  // 如果已登录，显示文件管理界面
+  // 如果已登录，显示子组件（标签页）
   if (isLoggedIn) {
-    return <FileManager />;
+    return <>{props.children}</>;
   }
 
   // 显示登录界面

@@ -29,8 +29,8 @@ function App() {
         height: 'calc(100vh - 48px)',
         padding: '0'
       }}>
-        {/* 暂时注释掉Login组件直接测试 */}
-        {/* <Login> */}
+        {/* 取消注释Login组件测试 */}
+        <Login>
           <Tabs 
             activeKey={activeTab} 
             onChange={setActiveTab}
@@ -73,7 +73,7 @@ function App() {
               </div>
             </TabPane>
           </Tabs>
-        {/* </Login> */}
+         </Login>
       </Content>
     </Layout>
   );
