@@ -1,4 +1,3 @@
-// src/services/api.tsx
 import axios from 'axios';
 
 const API_BASE = 'http://localhost:8000/api';
@@ -7,7 +6,7 @@ const api = axios.create({
   baseURL: API_BASE,
 });
 
-// 请求拦截器 - 自动添加token
+// 简单使用localStorage
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
   if (token) {

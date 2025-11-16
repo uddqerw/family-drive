@@ -70,17 +70,44 @@ func HandleFileUpload(w http.ResponseWriter, r *http.Request) {
 
 // 获取文件列表
 func HandleFileList(w http.ResponseWriter, r *http.Request) {
+    // 验证用户
     uid, err := getAuthUserID(r)
     if err != nil {
         writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
         return
     }
+    _ = uid // 使用变量避免编译警告
+
+    uploadDir := "./uploads"
     
-    // 这里应该从数据库获取用户的文件列表
-    // 暂时返回空数组，但使用uid变量避免编译错误
-    _ = uid // 使用uid变量避免"declared and not used"
-    
-    writeJSON(w, http.StatusOK, []FileInfo{})
+    // 确保上传目录存在
+    if _, err := os.Stat(uploadDir); os.IsNotExist(err) {
+        // 目录不存在，返回空数组
+        writeJSON(w, http.StatusOK, []FileInfo{})
+        return
+    }
+
+    // 读取目录
+    files, err := os.ReadDir(uploadDir)
+    if err != nil {
+        writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "read dir failed"})
+        return
+    }
+
+    var fileList []FileInfo
+    for _, file := range files {
+        if !file.IsDir() {
+            info, err := file.Info()
+            if err == nil {
+                fileList = append(fileList, FileInfo{
+                    Name: file.Name(),
+                    Size: info.Size(),
+                })
+            }
+        }
+    }
+
+    writeJSON(w, http.StatusOK, fileList)
 }
 // 下载文件
 func HandleFileDownload(w http.ResponseWriter, r *http.Request) {

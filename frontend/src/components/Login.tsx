@@ -1,23 +1,40 @@
-// src/components/Login.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button, Form, Input, Card, message } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { authAPI } from '../services/api';
-import FileManager from './FileManager'; // 导入文件管理组件
+import FileManager from './FileManager';
 
 const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false); // 新增登录状态
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  // 检查是否已登录
+  useEffect(() => {
+    const token = localStorage.getItem('access_token');
+    console.log('启动时检查Token:', token);
+    if (token) {
+      console.log('发现已保存的Token，自动登录');
+      setIsLoggedIn(true);
+    }
+  }, []);
 
   const onFinish = async (values: any) => {
     setLoading(true);
     try {
       const response = await authAPI.login(values.email, values.password);
-      localStorage.setItem('access_token', response.data.access_token);
+      const token = response.data.access_token;
+      console.log('登录成功，Token:', token);
+      
+      // 保存到localStorage
+      localStorage.setItem('access_token', token);
+      console.log('Token已保存到localStorage');
+      
       message.success('登录成功！');
-      setIsLoggedIn(true); // 更新登录状态
-    } catch (error) {
-      message.error('登录失败，请检查邮箱和密码');
+      setIsLoggedIn(true);
+      
+    } catch (error: any) {
+      console.error('登录失败:', error);
+      message.error('登录失败: ' + (error.response?.data?.error || '未知错误'));
     } finally {
       setLoading(false);
     }
@@ -28,7 +45,7 @@ const Login: React.FC = () => {
     return <FileManager />;
   }
 
-  // 否则显示登录界面
+  // 显示登录界面
   return (
     <div style={{ 
       display: 'flex', 
