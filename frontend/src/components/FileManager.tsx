@@ -102,21 +102,40 @@ const FileManager: React.FC<FileManagerProps> = () => {
     return new Date(dateString).toLocaleDateString('zh-CN', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric'
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
     });
   };
 
   // 加载文件列表
   const loadFiles = async () => {
     try {
-      const response = await fileAPI.list();
-      const filesWithCategory = (response.data || []).map((file: any) => ({
-        ...file,
-        category: getFileCategory(file.name),
-        uploadTime: file.uploadTime || new Date().toISOString()
-      }));
-      setFiles(filesWithCategory);
+      console.log('🔄 开始加载文件列表...');
+      const response = await fetch('http://localhost:8000/api/files/list');
+      
+      if (response.ok) {
+        const result = await response.json();
+        console.log('📁 后端返回数据:', result);
+        
+        if (result.success && result.data && Array.isArray(result.data)) {
+          const filesWithCategory = result.data.map((file: any) => ({
+            id: file.id || Date.now(),
+            name: file.name || '未知文件',
+            size: file.size || 0,
+            type: file.type || 'file',
+            uploadTime: file.uploadTime || new Date().toISOString(),
+            category: getFileCategory(file.name)
+          }));
+          
+          setFiles(filesWithCategory);
+          console.log('✅ 加载成功，文件数:', filesWithCategory.length);
+        }
+      } else {
+        console.log('❌ HTTP请求失败');
+      }
     } catch (error) {
+      console.error('🚨 加载文件列表失败:', error);
       message.error('加载文件列表失败');
     }
   };
@@ -127,7 +146,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
 
     // 关键词搜索
     if (filters.keyword) {
-      result = result.filter(file => 
+      result = result.filter(file =>
         file.name.toLowerCase().includes(filters.keyword.toLowerCase())
       );
     }
@@ -140,7 +159,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
     // 排序
     result.sort((a, b) => {
       let comparison = 0;
-      
+
       switch (filters.sortBy) {
         case 'name':
           comparison = a.name.localeCompare(b.name);
@@ -171,10 +190,22 @@ const FileManager: React.FC<FileManagerProps> = () => {
     formData.append('file', file);
 
     try {
-      await fileAPI.upload(formData);
-      message.success(`文件 "${file.name}" 上传成功`);
-      await loadFiles();
+      console.log('📤 上传文件:', file.name, '大小:', file.size);
+      const response = await fetch('http://localhost:8000/api/files/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ 上传成功:', result);
+        message.success(`文件 "${file.name}" 上传成功`);
+        await loadFiles(); // 重新加载文件列表
+      } else {
+        throw new Error('上传失败');
+      }
     } catch (error) {
+      console.error('❌ 上传失败:', error);
       message.error('文件上传失败');
     } finally {
       setUploading(false);
@@ -186,7 +217,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
   const handleDownload = async (filename: string) => {
     console.log('🚀 开始下载:', filename);
     setDownloading(filename);
-    
+
     setDownloadStatus({
       show: true,
       type: 'loading',
@@ -194,9 +225,14 @@ const FileManager: React.FC<FileManagerProps> = () => {
     });
 
     try {
-      const response = await fileAPI.download(filename);
+      // 直接使用 fetch 下载
+      const response = await fetch(`http://localhost:8000/api/files/download/${filename}`);
       
-      const blob = new Blob([response.data]);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -205,28 +241,30 @@ const FileManager: React.FC<FileManagerProps> = () => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
+
       setDownloadStatus({
         show: true,
         type: 'success',
         filename: filename
       });
-      
+
       console.log('✅ 下载完成:', filename);
-      
+
       setTimeout(() => {
         setDownloadStatus(null);
       }, 3000);
-      
+
     } catch (error: any) {
       console.error('❌ 下载失败:', error);
-      
+
       setDownloadStatus({
         show: true,
-        type: 'error', 
+        type: 'error',
         filename: filename
       });
-      
+
+      message.error('下载失败，请重试');
+
       setTimeout(() => {
         setDownloadStatus(null);
       }, 5000);
@@ -242,9 +280,16 @@ const FileManager: React.FC<FileManagerProps> = () => {
     }
 
     try {
-      await fileAPI.delete(filename);
-      message.success(`✅ 文件 "${filename}" 删除成功`);
-      await loadFiles();
+      const response = await fetch(`http://localhost:8000/api/files/delete/${filename}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        message.success(`文件 "${filename}" 删除成功`);
+        await loadFiles(); // 重新加载文件列表
+      } else {
+        throw new Error('删除失败');
+      }
     } catch (error: any) {
       console.error('删除失败:', error);
       message.error('文件删除失败');
@@ -295,6 +340,15 @@ const FileManager: React.FC<FileManagerProps> = () => {
           </div>
         }
         className="file-manager-card"
+        extra={
+          <Button 
+            icon={<SearchOutlined />} 
+            onClick={loadFiles}
+            type="primary"
+          >
+            刷新列表
+          </Button>
+        }
       >
         {/* 搜索和筛选工具栏 */}
         <div className="search-toolbar">
@@ -387,12 +441,13 @@ const FileManager: React.FC<FileManagerProps> = () => {
             showUploadList={false}
             beforeUpload={handleUpload}
             className="upload-dragger"
+            disabled={uploading}
           >
             <div className="upload-content">
               <UploadOutlined className="upload-icon" />
               <div className="upload-text">
                 <div>点击或拖拽文件到此处上传</div>
-                <div className="upload-hint">支持单个或批量上传</div>
+                <div className="upload-hint">支持单个或批量上传，最大 10MB</div>
               </div>
             </div>
           </Upload.Dragger>
@@ -413,8 +468,8 @@ const FileManager: React.FC<FileManagerProps> = () => {
                 {files.length === 0 ? '暂无文件' : '未找到匹配的文件'}
               </div>
               <div className="empty-hint">
-                {files.length === 0 
-                  ? '上传第一个文件开始使用家庭网盘' 
+                {files.length === 0
+                  ? '上传第一个文件开始使用家庭网盘'
                   : '尝试调整搜索条件或清除筛选'
                 }
               </div>
@@ -429,7 +484,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
               <div className="file-grid-container">
                 <Row gutter={[16, 16]} className="file-grid">
                   {filteredFiles.map((file, index) => (
-                    <Col xs={24} sm={12} md={8} lg={6} key={index}>
+                    <Col xs={24} sm={12} md={8} lg={6} key={file.id || index}>
                       <div className="file-card">
                         <div className="file-header">
                           {getFileIcon(file.name)}
@@ -439,8 +494,12 @@ const FileManager: React.FC<FileManagerProps> = () => {
                         </div>
                         <div className="file-info">
                           <div className="file-meta">
-                            <div className="file-size">{formatFileSize(file.size)}</div>
-                            <div className="file-date">{formatDate(file.uploadTime)}</div>
+                            <div className="file-size">
+                              <strong>大小:</strong> {formatFileSize(file.size)}
+                            </div>
+                            <div className="file-date">
+                              <strong>上传:</strong> {formatDate(file.uploadTime)}
+                            </div>
                             <div className="file-type">
                               <Tag size="small" color={
                                 file.category === 'image' ? 'green' :
@@ -463,7 +522,9 @@ const FileManager: React.FC<FileManagerProps> = () => {
                               title="下载"
                               loading={downloading === file.name}
                               disabled={!!downloading}
-                            />
+                            >
+                              下载
+                            </Button>
                             <Button
                               type="link"
                               danger
@@ -471,7 +532,9 @@ const FileManager: React.FC<FileManagerProps> = () => {
                               onClick={() => handleDelete(file.name)}
                               title="删除"
                               disabled={!!downloading}
-                            />
+                            >
+                              删除
+                            </Button>
                           </div>
                         </div>
                       </div>
