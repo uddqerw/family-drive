@@ -10,7 +10,7 @@ import {
   FileWordOutlined, FileExcelOutlined, FileZipOutlined,
   VideoCameraOutlined, SearchOutlined
 } from '@ant-design/icons';
-import { fileAPI } from '../services/api';
+// import { fileAPI } from '../services/api';
 import './FileManager.css';
 
 const { Search } = Input;
@@ -501,7 +501,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
                               <strong>上传:</strong> {formatDate(file.uploadTime)}
                             </div>
                             <div className="file-type">
-                              <Tag size="small" color={
+                              <Tag color={
                                 file.category === 'image' ? 'green' :
                                 file.category === 'document' ? 'blue' :
                                 file.category === 'video' ? 'purple' :

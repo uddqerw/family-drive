@@ -31,12 +31,10 @@ const ChatPanel: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
-  
-  const syncIntervalRef = useRef<NodeJS.Timeout>();
-
+  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null);  // 🆕 添加 null 初始值
   // 同步消息函数
   const syncMessages = async () => {
-    if (syncing || isClearing) return;
+  if (syncing || isClearing) return;
     
     setSyncing(true);
     try {

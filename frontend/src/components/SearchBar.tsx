@@ -7,7 +7,7 @@ const { Search } = Input;
 const { Option } = Select;
 
 interface SearchBarProps {
-  onSearch: (keyword: string) => void;
+  // onSearch: (keyword: string) => void;
   onFilterChange: (filterType: string, value: string) => void;
   filters: {
     keyword: string;
@@ -18,7 +18,7 @@ interface SearchBarProps {
 }
 
 const SearchBar: React.FC<SearchBarProps> = ({ 
-  onSearch, 
+  // onSearch, 
   onFilterChange, 
   filters 
 }) => {
