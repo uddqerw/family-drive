@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,7 +14,9 @@ import (
 	"sync"
 	"time"
 	
+	"golang.org/x/crypto/bcrypt"
 	"github.com/gorilla/websocket"
+	_ "github.com/go-sql-driver/mysql"
 )
 
 // 聊天消息结构
@@ -28,6 +31,15 @@ type ChatMessage struct {
 	Timestamp string `json:"timestamp"`
 }
 
+// 用户结构
+type User struct {
+	ID        int       `json:"id"`
+	Username  string    `json:"username"`
+	Email     string    `json:"email"`
+	Password  string    `json:"-"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 // 全局变量
 var (
 	chatMessages []ChatMessage
@@ -35,12 +47,49 @@ var (
 	clients      = make(map[*websocket.Conn]bool)
 	broadcast    = make(chan ChatMessage)
 	port         = "8000"
+	db           *sql.DB // MySQL 数据库连接
 	upgrader     = websocket.Upgrader{
 		CheckOrigin: func(r *http.Request) bool {
 			return true // 允许所有来源
 		},
 	}
 )
+
+// 密码加密
+func hashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(bytes), err
+}
+
+// 密码验证
+func checkPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+
+// 初始化数据库
+func initDB() {
+	var err error
+	// 修改为你的 MySQL 配置
+	dsn := "root:Root@20160212@tcp(localhost:3306)/family_drive?charset=utf8mb4&parseTime=True"
+	db, err = sql.Open("mysql", dsn)
+	if err != nil {
+		log.Fatal("❌ 数据库连接失败:", err)
+	}
+	
+	// 测试连接
+	err = db.Ping()
+	if err != nil {
+		log.Fatal("❌ 数据库连接测试失败:", err)
+	}
+	
+	log.Println("✅ MySQL 数据库连接成功")
+	
+	// 设置连接池参数
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(5 * time.Minute)
+}
 
 // WebSocket 处理
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
@@ -114,7 +163,7 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// 登录处理
+// 登录处理 - MySQL 版本
 func handleLogin(w http.ResponseWriter, r *http.Request) {
 	log.Printf("🔐 处理登录请求")
 	
@@ -142,31 +191,58 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Email == "" || req.Password == "" {
+	// 从数据库查询用户
+	var userID int
+	var username, email, passwordHash string
+	err := db.QueryRow(
+		"SELECT id, username, email, password_hash FROM users WHERE email = ?", 
+		req.Email,
+	).Scan(&userID, &username, &email, &passwordHash)
+	
+	if err == sql.ErrNoRows {
+		log.Printf("❌ 登录失败: 邮箱未注册 - %s", req.Email)
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
-			"message": "邮箱和密码不能为空",
+			"message": "邮箱未注册",
+		})
+		return
+	} else if err != nil {
+		log.Printf("❌ 数据库查询错误: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"message": "服务器内部错误",
 		})
 		return
 	}
-
+	
+	// 验证密码
+	if !checkPasswordHash(req.Password, passwordHash) {
+		log.Printf("❌ 登录失败: 密码错误 - %s", req.Email)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"message": "密码错误",
+		})
+		return
+	}
+	
+	// 登录成功
+	log.Printf("✅ 用户登录成功: %s (%s)", username, email)
+	
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "登录成功",
 		"data": map[string]interface{}{
-			"access_token": "mock_token_" + fmt.Sprintf("%d", time.Now().Unix()),
+			"access_token": "family_drive_token_" + fmt.Sprintf("%d", time.Now().Unix()),
 			"user": map[string]interface{}{
-				"id":       1,
-				"username": "家庭成员",
-				"email":    req.Email,
+				"id":       userID,
+				"username": username,
+				"email":    email,
 			},
 		},
 	})
-	
-	log.Printf("✅ 用户登录: %s", req.Email)
 }
 
-// 注册处理
+// 注册处理 - MySQL 版本
 func handleRegister(w http.ResponseWriter, r *http.Request) {
 	log.Printf("🔐 处理注册请求")
 	
@@ -195,6 +271,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 验证输入
 	if req.Username == "" || req.Email == "" || req.Password == "" {
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"success": false,
@@ -211,17 +288,66 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 检查邮箱是否已存在
+	var existingEmail string
+	err := db.QueryRow("SELECT email FROM users WHERE email = ?", req.Email).Scan(&existingEmail)
+	if err != sql.ErrNoRows {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"message": "邮箱已被注册",
+		})
+		return
+	}
+
+	// 检查用户名是否已存在
+	var existingUsername string
+	err = db.QueryRow("SELECT username FROM users WHERE username = ?", req.Username).Scan(&existingUsername)
+	if err != sql.ErrNoRows {
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"message": "用户名已被使用",
+		})
+		return
+	}
+	
+	// 密码加密
+	passwordHash, err := hashPassword(req.Password)
+	if err != nil {
+		log.Printf("❌ 密码加密失败: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"message": "服务器内部错误",
+		})
+		return
+	}
+	
+	// 插入新用户
+	result, err := db.Exec(
+		"INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
+		req.Username, req.Email, passwordHash,
+	)
+	if err != nil {
+		log.Printf("❌ 用户注册失败: %v", err)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"message": "注册失败，请重试",
+		})
+		return
+	}
+	
+	userID, _ := result.LastInsertId()
+	
+	log.Printf("✅ 新用户注册: %s (%s)", req.Username, req.Email)
+	
 	json.NewEncoder(w).Encode(map[string]interface{}{
 		"success": true,
 		"message": "注册成功",
 		"data": map[string]interface{}{
-			"id":       time.Now().Unix(),
+			"id":       userID,
 			"username": req.Username,
 			"email":    req.Email,
 		},
 	})
-	
-	log.Printf("✅ 新用户注册: %s (%s)", req.Username, req.Email)
 }
 
 // 发送消息处理
@@ -607,6 +733,10 @@ func handleFileDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// 初始化数据库
+	initDB()
+	defer db.Close()
+
 	// 初始化目录
 	os.MkdirAll("./uploads", 0755)
 	os.MkdirAll("./uploads/voices", 0755)
@@ -637,23 +767,27 @@ func main() {
 	mux.HandleFunc("/api/files/upload", handleFileUpload)
 	mux.HandleFunc("/api/files/list", handleFileList)
 	mux.HandleFunc("/api/files/delete/", handleFileDelete)
-	mux.HandleFunc("/ws", handleWebSocket)  // WebSocket 路由
+	mux.HandleFunc("/ws", handleWebSocket)
 	
 	// 静态文件服务
 	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
 	
-	// 启动服务器
-	log.Println("🚀 家庭网盘服务器启动成功!")
-	log.Printf("📍 服务地址: http://localhost:%s", port)
-	log.Printf("🔗 WebSocket: ws://localhost:%s/ws", port)
-	log.Printf("💬 聊天接口: http://localhost:%s/api/chat/messages", port)
-	log.Printf("📁 文件接口: http://localhost:%s/api/files/list", port)
-	log.Printf("🗑️  清除聊天: http://localhost:%s/api/chat/clear", port)
+	// HTTPS 启动
+	certFile := "localhost+2.pem"      // 证书文件
+	keyFile := "localhost+2-key.pem"   // 密钥文件
+	
+	log.Println("🚀 家庭网盘 HTTPS 服务器启动成功!")
+	log.Printf("📍 服务地址: https://localhost:%s", port)
+	log.Printf("🔗 WebSocket: wss://localhost:%s/ws", port)
+	log.Printf("💬 聊天接口: https://localhost:%s/api/chat/messages", port)
+	log.Printf("📁 文件接口: https://localhost:%s/api/files/list", port)
+	log.Printf("🔐 使用安全连接 (HTTPS)")
 	log.Printf("⏰ 启动时间: %s", time.Now().Format("2006-01-02 15:04:05"))
 	log.Println("==================================================")
 	
-	err := http.ListenAndServe(":"+port, mux)
+	// 使用 HTTPS
+	err := http.ListenAndServeTLS(":"+port, certFile, keyFile, mux)
 	if err != nil {
-		log.Fatal("服务器启动失败:", err)
+		log.Fatal("HTTPS 服务器启动失败:", err)
 	}
 }

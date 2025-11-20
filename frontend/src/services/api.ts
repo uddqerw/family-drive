@@ -6,6 +6,11 @@ const api = axios.create({
   timeout: 10000, // 10秒超时
 });
 
+export const API_CONFIG = {
+  baseURL: 'https://localhost:8000',  // 后端是 HTTPS
+  timeout: 10000,
+};
+
 // 请求拦截器 - 自动添加Token
 api.interceptors.request.use(
   (config) => {
