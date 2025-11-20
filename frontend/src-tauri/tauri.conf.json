@@ -5,7 +5,7 @@
   "identifier": "com.family.drive",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:1420"
+    "devUrl": "http://localhost:3000"
   },
   "app": {
     "windows": [
