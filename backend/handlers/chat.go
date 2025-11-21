@@ -2,9 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
-	"family-drive/backend/models"
-	"family-drive/backend/websocket"
-	"log"
+	"familydrive/models"
+	"familydrive/websocket"
 	"net/http"
 	"time"
 )

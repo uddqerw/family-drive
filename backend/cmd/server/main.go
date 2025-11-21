@@ -13,6 +13,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+        "familydrive/handlers"
+        "familydrive/middleware"
 	
 	"golang.org/x/crypto/bcrypt"
 	"github.com/gorilla/websocket"
@@ -736,6 +739,7 @@ func main() {
 	// 初始化数据库
 	initDB()
 	defer db.Close()
+        handlers.SetDB(db)
 
 	// 初始化目录
 	os.MkdirAll("./uploads", 0755)
@@ -768,13 +772,10 @@ func main() {
 	mux.HandleFunc("/api/files/list", handleFileList)
 	mux.HandleFunc("/api/files/delete/", handleFileDelete)
 	mux.HandleFunc("/ws", handleWebSocket)
+        mux.HandleFunc("/api/auth/me", middleware.AuthMiddleware(handlers.HandleGetCurrentUser))
 	
 	// 静态文件服务
 	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
-	
-	// HTTPS 启动
-	certFile := "localhost+2.pem"      // 证书文件
-	keyFile := "localhost+2-key.pem"   // 密钥文件
 	
 	log.Println("🚀 家庭网盘 HTTPS 服务器启动成功!")
 	log.Printf("📍 服务地址: https://localhost:%s", port)
@@ -786,7 +787,7 @@ func main() {
 	log.Println("==================================================")
 	
 	// 使用 HTTPS
-	err := http.ListenAndServeTLS(":"+port, certFile, keyFile, mux)
+	err := http.ListenAndServeTLS(":"+port, mux)
 	if err != nil {
 		log.Fatal("HTTPS 服务器启动失败:", err)
 	}

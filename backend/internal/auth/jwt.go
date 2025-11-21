@@ -12,9 +12,17 @@ var jwtSecret []byte
 func init() {
 	secret := os.Getenv("FAMILYDRIVE_JWT_SECRET")
 	if secret == "" {
-		secret = "change-me-to-strong-secret" // 开发时使用，生产请设 env
+		secret = "family-drive-super-secret-key-change-in-production" // 开发时使用，生产请设 env
 	}
 	jwtSecret = []byte(secret)
+}
+
+// UserClaims 包含完整的用户信息
+type UserClaims struct {
+	UserID   int    `json:"user_id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	jwt.RegisteredClaims
 }
 
 // GenerateAccessToken generates JWT access token valid for duration d.
@@ -42,4 +50,42 @@ func ParseAccessToken(tok string) (int64, error) {
 		}
 	}
 	return 0, nil
+}
+
+// GenerateUserToken 生成包含完整用户信息的 JWT Token
+func GenerateUserToken(userID int, username, email string, d time.Duration) (string, error) {
+	claims := &UserClaims{
+		UserID:   userID,
+		Username: username,
+		Email:    email,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(d)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			Issuer:    "family-drive",
+		},
+	}
+	
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtSecret)
+}
+
+// ParseUserToken 解析Token并返回完整的用户信息
+func ParseUserToken(tok string) (*UserClaims, error) {
+	claims := &UserClaims{}
+	
+	token, err := jwt.ParseWithClaims(tok, claims, func(t *jwt.Token) (interface{}, error) {
+		return jwtSecret, nil
+	})
+	
+	if err != nil || !token.Valid {
+		return nil, err
+	}
+	
+	return claims, nil
+}
+
+// ValidateToken 验证Token有效性
+func ValidateToken(tok string) bool {
+	_, err := ParseUserToken(tok)
+	return err == nil
 }
