@@ -740,6 +740,7 @@ func main() {
 	initDB()
 	defer db.Close()
         handlers.SetDB(db)
+        // handlers.SetShareDB(db)      // 🔥 新增：分享链接处理器
 
 	// 初始化目录
 	os.MkdirAll("./uploads", 0755)
@@ -771,6 +772,10 @@ func main() {
         mux.HandleFunc("/api/files/upload", middleware.CORS(handleFileUpload))
         mux.HandleFunc("/api/files/list", middleware.CORS(handleFileList))
         mux.HandleFunc("/api/files/delete/", middleware.CORS(handleFileDelete))
+        mux.HandleFunc("/api/files/share/", middleware.CORS(handlers.GenerateShareLink))
+        mux.HandleFunc("/api/files/shared/", middleware.CORS(handlers.AccessSharedFile))
+        mux.HandleFunc("/api/files/shares", middleware.CORS(handlers.GetShareLinks))
+	mux.HandleFunc("/api/files/share/delete/", middleware.CORS(handlers.DeleteShareLink))
         mux.HandleFunc("/ws", handleWebSocket)
 
         // 这个需要特殊处理 - 使用 handlers 包函数 + 认证中间件
