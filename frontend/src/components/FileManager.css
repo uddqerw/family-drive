@@ -230,3 +230,208 @@
 .file-list-section::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
 }
+/* 分享模态框样式 */
+.share-form .ant-form-item {
+  margin-bottom: 16px;
+}
+
+.share-form label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+  color: #333;
+}
+
+.share-result .ant-alert {
+  margin-bottom: 16px;
+  border-radius: 6px;
+}
+
+/* 分享链接复制区域 */
+.ant-input-group.compact {
+  display: flex;
+}
+
+.ant-input-group.compact .ant-input {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  flex: 1;
+}
+
+.ant-input-group.compact .ant-btn {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: none;
+}
+
+/* 分享信息展示 */
+.share-info {
+  background: #f8f9fa;
+  padding: 12px;
+  border-radius: 6px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: #666;
+}
+
+.share-info div {
+  margin-bottom: 4px;
+}
+
+.share-info div:last-child {
+  margin-bottom: 0;
+}
+
+/* 文件操作按钮优化 */
+.file-actions .ant-btn-link {
+  padding: 4px 8px;
+  height: auto;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.file-actions .ant-btn-link:hover {
+  background: rgba(24, 144, 255, 0.1);
+}
+
+/* 分享按钮特殊样式 */
+.file-actions .ant-btn-link:not(.ant-btn-dangerous) {
+  color: #52c41a;
+}
+
+.file-actions .ant-btn-link:not(.ant-btn-dangerous):hover {
+  color: #73d13d;
+  background: rgba(82, 196, 26, 0.1);
+}
+
+/* 模态框头部样式 */
+.ant-modal-header {
+  border-bottom: 1px solid #f0f0f0;
+  padding: 16px 24px;
+}
+
+.ant-modal-title {
+  font-weight: 600;
+  color: #333;
+}
+
+.ant-modal-body {
+  padding: 24px;
+}
+
+/* 响应式适配 */
+@media (max-width: 768px) {
+  .share-form .ant-input-group {
+    flex-direction: column;
+  }
+  
+  .share-form .ant-input-group .ant-input {
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  
+  .share-form .ant-input-group .ant-btn {
+    border-radius: 6px;
+    border-left: 1px solid #d9d9d9;
+  }
+  
+  .file-actions {
+    flex-direction: column;
+    gap: 4px;
+  }
+  
+  .file-actions .ant-btn-link {
+    justify-content: center;
+    padding: 8px;
+  }
+}
+
+/* 加载状态 */
+.share-loading {
+  text-align: center;
+  padding: 20px;
+}
+
+.share-loading .ant-spin {
+  margin-bottom: 12px;
+}
+
+/* 错误状态 */
+.share-error {
+  text-align: center;
+  padding: 20px;
+  color: #ff4d4f;
+}
+
+.share-error .anticon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+/* 成功状态 */
+.share-success {
+  text-align: center;
+  padding: 20px;
+  color: #52c41a;
+}
+
+.share-success .anticon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+/* 密码输入框样式 */
+.ant-input-password .ant-input {
+  border-radius: 6px;
+}
+
+/* 数字输入框样式 */
+.ant-input-number {
+  width: 100%;
+}
+
+.ant-input-number .ant-input-number-input {
+  border-radius: 6px;
+}
+
+/* 按钮组样式 */
+.ant-btn-block {
+  border-radius: 6px;
+  height: 40px;
+  font-weight: 500;
+}
+
+/* 分享模态框动画 */
+.ant-modal {
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 暗色主题支持 */
+@media (prefers-color-scheme: dark) {
+  .share-info {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+  }
+  
+  .file-actions .ant-btn-link:not(.ant-btn-dangerous) {
+    color: #95de64;
+  }
+  
+  .file-actions .ant-btn-link:not(.ant-btn-dangerous):hover {
+    color: #b7eb8f;
+    background: rgba(149, 222, 100, 0.1);
+  }
+}

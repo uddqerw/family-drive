@@ -2,19 +2,20 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Button, Upload, message, Card,
   Row, Col, Tag, Progress, Alert,
-  Input, Select, Space
+  Input, Select, Space, Checkbox, Modal
 } from 'antd';
 import {
   UploadOutlined, DownloadOutlined, DeleteOutlined,
   FileOutlined, FileImageOutlined, FilePdfOutlined,
   FileWordOutlined, FileExcelOutlined, FileZipOutlined,
-  VideoCameraOutlined, SearchOutlined
+  VideoCameraOutlined, SearchOutlined, ShareAltOutlined,
+  LockOutlined, ExclamationCircleOutlined
 } from '@ant-design/icons';
-// import { fileAPI } from '../services/api';
 import './FileManager.css';
 
 const { Search } = Input;
 const { Option } = Select;
+const { confirm } = Modal;
 
 // 文件类型图标映射
 const fileIcons = {
@@ -46,6 +47,7 @@ interface FileItem {
   type: string;
   uploadTime: string;
   category: 'image' | 'document' | 'video' | 'archive' | 'other';
+  isPrivate?: boolean;
 }
 
 interface SearchFilters {
@@ -54,6 +56,152 @@ interface SearchFilters {
   sortBy: 'name' | 'size' | 'date' | 'type';
   sortOrder: 'asc' | 'desc';
 }
+
+// 分享模态框组件
+interface ShareModalProps {
+  file: FileItem;
+  onClose: () => void;
+  visible: boolean;
+}
+
+const ShareModal: React.FC<ShareModalProps> = ({ file, onClose, visible }) => {
+  const [shareOptions, setShareOptions] = useState({
+    expire_hours: 24,
+    max_access: 10,
+    password: '',
+  });
+  const [shareLink, setShareLink] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const createShare = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`https://localhost:8000/api/files/share/${encodeURIComponent(file.name)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...shareOptions,
+          user_id: 1
+        })
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        setShareLink(result.data.share_url);
+        message.success('分享链接创建成功！');
+      } else {
+        message.error(result.message || '创建分享失败');
+      }
+    } catch (error) {
+      console.error('创建分享失败:', error);
+      message.error('创建分享失败，请检查后端服务');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(shareLink);
+    message.success('链接已复制到剪贴板！');
+  };
+
+  const resetForm = () => {
+    setShareLink('');
+    setShareOptions({
+      expire_hours: 24,
+      max_access: 10,
+      password: '',
+    });
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  return (
+    <Modal
+      title={`分享文件: ${file.name}`}
+      open={visible}
+      onCancel={handleClose}
+      footer={null}
+      width={500}
+    >
+      {!shareLink ? (
+        <div className="share-form">
+          <div style={{ marginBottom: 16 }}>
+            <label>有效期:</label>
+            <Input
+              type="number"
+              value={shareOptions.expire_hours}
+              onChange={e => setShareOptions({...shareOptions, expire_hours: +e.target.value})}
+              addonAfter="小时"
+              style={{ marginTop: 8 }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <label>最大访问次数:</label>
+            <Input
+              type="number"
+              value={shareOptions.max_access}
+              onChange={e => setShareOptions({...shareOptions, max_access: +e.target.value})}
+              style={{ marginTop: 8 }}
+            />
+          </div>
+
+          <div style={{ marginBottom: 24 }}>
+            <label>访问密码 (可选):</label>
+            <Input.Password
+              placeholder="设置访问密码"
+              value={shareOptions.password}
+              onChange={e => setShareOptions({...shareOptions, password: e.target.value})}
+              style={{ marginTop: 8 }}
+            />
+          </div>
+
+          <Button
+            type="primary"
+            onClick={createShare}
+            loading={loading}
+            block
+          >
+            {loading ? '生成中...' : '生成分享链接'}
+          </Button>
+        </div>
+      ) : (
+        <div className="share-result">
+          <Alert
+            message="分享链接创建成功！"
+            type="success"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+          <div style={{ marginBottom: 16 }}>
+            <Input.Group compact>
+              <Input
+                value={shareLink}
+                readOnly
+                style={{ width: 'calc(100% - 80px)' }}
+              />
+              <Button type="primary" onClick={handleCopyLink}>
+                复制
+              </Button>
+            </Input.Group>
+          </div>
+          <div style={{ color: '#666', fontSize: 12 }}>
+            <div>有效期: {shareOptions.expire_hours} 小时</div>
+            <div>最大访问次数: {shareOptions.max_access} 次</div>
+            {shareOptions.password && <div>访问密码: 已设置</div>}
+          </div>
+          <Button onClick={handleClose} block style={{ marginTop: 16 }}>
+            关闭
+          </Button>
+        </div>
+      )}
+    </Modal>
+  );
+};
 
 const FileManager: React.FC<FileManagerProps> = () => {
   const [files, setFiles] = useState<FileItem[]>([]);
@@ -66,6 +214,15 @@ const FileManager: React.FC<FileManagerProps> = () => {
     sortBy: 'name',
     sortOrder: 'asc'
   });
+  
+  // 添加上传选项状态
+  const [uploadOptions, setUploadOptions] = useState({
+    isPrivate: false,
+    sharePassword: ''
+  });
+  
+  const [shareModalVisible, setShareModalVisible] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
 
   // 获取文件分类
   const getFileCategory = (filename: string): FileItem['category'] => {
@@ -113,30 +270,48 @@ const FileManager: React.FC<FileManagerProps> = () => {
     try {
       console.log('🔄 开始加载文件列表...');
       const response = await fetch('https://localhost:8000/api/files/list');
-      
+
       if (response.ok) {
         const result = await response.json();
         console.log('📁 后端返回数据:', result);
-        
-        if (result.success && result.data && Array.isArray(result.data)) {
+
+        if (Array.isArray(result)) {
+          const filesWithCategory = result.map((file: any) => ({
+            id: file.id || Date.now(),
+            name: file.name || '未知文件',
+            size: file.size || 0,
+            type: file.type || 'file',
+            uploadTime: file.uploadTime || new Date().toISOString(),
+            category: getFileCategory(file.name),
+            isPrivate: file.isPrivate || false
+          }));
+
+          setFiles(filesWithCategory);
+          console.log('✅ 加载成功，文件数:', filesWithCategory.length);
+        } else if (result.success && result.data && Array.isArray(result.data)) {
           const filesWithCategory = result.data.map((file: any) => ({
             id: file.id || Date.now(),
             name: file.name || '未知文件',
             size: file.size || 0,
             type: file.type || 'file',
             uploadTime: file.uploadTime || new Date().toISOString(),
-            category: getFileCategory(file.name)
+            category: getFileCategory(file.name),
+            isPrivate: file.isPrivate || false
           }));
-          
+
           setFiles(filesWithCategory);
           console.log('✅ 加载成功，文件数:', filesWithCategory.length);
+        } else {
+          // 如果返回格式不符合预期，使用空数组
+          setFiles([]);
         }
       } else {
         console.log('❌ HTTP请求失败');
+        message.error('加载文件列表失败');
       }
     } catch (error) {
       console.error('🚨 加载文件列表失败:', error);
-      message.error('加载文件列表失败');
+      message.error('加载文件列表失败，请检查网络连接');
     }
   };
 
@@ -183,14 +358,20 @@ const FileManager: React.FC<FileManagerProps> = () => {
     return result;
   }, [files, filters]);
 
-  // 文件上传
+  // 上传处理函数
   const handleUpload = async (file: File) => {
     setUploading(true);
     const formData = new FormData();
     formData.append('file', file);
+    
+    // 添加私密文件选项
+    if (uploadOptions.isPrivate && uploadOptions.sharePassword) {
+      formData.append('is_private', 'true');
+      formData.append('share_password', uploadOptions.sharePassword);
+    }
 
     try {
-      console.log('📤 上传文件:', file.name, '大小:', file.size);
+      console.log('📤 上传文件:', file.name, '私密:', uploadOptions.isPrivate);
       const response = await fetch('https://localhost:8000/api/files/upload', {
         method: 'POST',
         body: formData,
@@ -199,14 +380,29 @@ const FileManager: React.FC<FileManagerProps> = () => {
       if (response.ok) {
         const result = await response.json();
         console.log('✅ 上传成功:', result);
-        message.success(`文件 "${file.name}" 上传成功`);
+        
+        // 根据是否私密显示不同消息
+        message.success(
+          uploadOptions.isPrivate 
+            ? `🔒 文件 "${file.name}" 上传成功（私密文件）`
+            : `✅ 文件 "${file.name}" 上传成功`
+        );
+        
+        // 重置上传选项
+        setUploadOptions({
+          isPrivate: false,
+          sharePassword: ''
+        });
+        
         await loadFiles(); // 重新加载文件列表
       } else {
+        const errorText = await response.text();
+        console.error('❌ 上传失败:', errorText);
         throw new Error('上传失败');
       }
     } catch (error) {
       console.error('❌ 上传失败:', error);
-      message.error('文件上传失败');
+      message.error('文件上传失败，请检查网络连接');
     } finally {
       setUploading(false);
     }
@@ -225,9 +421,9 @@ const FileManager: React.FC<FileManagerProps> = () => {
     });
 
     try {
-      // 直接使用 fetch 下载
-      const response = await fetch(`https://localhost:8000/api/files/download/${filename}`);
-      
+      // 使用 encodeURIComponent 处理文件名
+      const response = await fetch(`https://localhost:8000/api/files/download/${encodeURIComponent(filename)}`);
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
       }
@@ -275,25 +471,35 @@ const FileManager: React.FC<FileManagerProps> = () => {
 
   // 文件删除
   const handleDelete = async (filename: string) => {
-    if (!window.confirm(`确定要删除文件 "${filename}" 吗？此操作不可撤销。`)) {
-      return;
-    }
+    confirm({
+      title: '确认删除',
+      icon: <ExclamationCircleOutlined />,
+      content: `确定要删除文件 "${filename}" 吗？此操作不可撤销。`,
+      okText: '确认删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          const response = await fetch(`https://localhost:8000/api/files/delete/${encodeURIComponent(filename)}`, {
+            method: 'DELETE',
+          });
 
-    try {
-      const response = await fetch(`https://localhost:8000/api/files/delete/${filename}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        message.success(`文件 "${filename}" 删除成功`);
-        await loadFiles(); // 重新加载文件列表
-      } else {
-        throw new Error('删除失败');
-      }
-    } catch (error: any) {
-      console.error('删除失败:', error);
-      message.error('文件删除失败');
-    }
+          if (response.ok) {
+            const result = await response.json();
+            console.log('✅ 删除成功:', result);
+            message.success(`文件 "${filename}" 删除成功`);
+            await loadFiles(); // 重新加载文件列表
+          } else {
+            const errorText = await response.text();
+            console.error('❌ 删除失败:', errorText);
+            throw new Error('删除失败');
+          }
+        } catch (error: any) {
+          console.error('删除失败:', error);
+          message.error('文件删除失败，请重试');
+        }
+      },
+    });
   };
 
   // 处理过滤条件变化
@@ -312,7 +518,8 @@ const FileManager: React.FC<FileManagerProps> = () => {
       documents: files.filter(f => f.category === 'document').length,
       videos: files.filter(f => f.category === 'video').length,
       archives: files.filter(f => f.category === 'archive').length,
-      others: files.filter(f => f.category === 'other').length
+      others: files.filter(f => f.category === 'other').length,
+      privateFiles: files.filter(f => f.isPrivate).length
     };
     return stats;
   };
@@ -336,13 +543,14 @@ const FileManager: React.FC<FileManagerProps> = () => {
               {fileStats.images > 0 && <Tag color="green">📸 {fileStats.images}</Tag>}
               {fileStats.documents > 0 && <Tag color="blue">📄 {fileStats.documents}</Tag>}
               {fileStats.videos > 0 && <Tag color="purple">🎥 {fileStats.videos}</Tag>}
+              {fileStats.privateFiles > 0 && <Tag color="red">🔒 {fileStats.privateFiles}</Tag>}
             </Space>
           </div>
         }
         className="file-manager-card"
         extra={
-          <Button 
-            icon={<SearchOutlined />} 
+          <Button
+            icon={<SearchOutlined />}
             onClick={loadFiles}
             type="primary"
           >
@@ -434,6 +642,49 @@ const FileManager: React.FC<FileManagerProps> = () => {
           </div>
         )}
 
+        {/* 上传选项 */}
+        <div className="upload-options" style={{ 
+          margin: '16px', 
+          padding: '16px', 
+          background: '#f8f9fa', 
+          borderRadius: '8px',
+          border: '1px solid #e1e5e9'
+        }}>
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Checkbox 
+              checked={uploadOptions.isPrivate}
+              onChange={e => setUploadOptions({
+                ...uploadOptions, 
+                isPrivate: e.target.checked,
+                sharePassword: e.target.checked ? uploadOptions.sharePassword : ''
+              })}
+            >
+              <LockOutlined style={{ color: '#ff4d4f', marginRight: 8 }} />
+              私密文件（需要密码访问）
+            </Checkbox>
+            
+            {uploadOptions.isPrivate && (
+              <div style={{ marginLeft: 24 }}>
+                <Space>
+                  <Input.Password
+                    placeholder="设置访问密码"
+                    value={uploadOptions.sharePassword}
+                    onChange={e => setUploadOptions({
+                      ...uploadOptions, 
+                      sharePassword: e.target.value
+                    })}
+                    style={{ width: 200 }}
+                    size="middle"
+                  />
+                  <span style={{ fontSize: '12px', color: '#666' }}>
+                    下载此文件时需要输入密码
+                  </span>
+                </Space>
+              </div>
+            )}
+          </Space>
+        </div>
+
         {/* 上传区域 */}
         <div className="upload-section">
           <Upload.Dragger
@@ -448,6 +699,11 @@ const FileManager: React.FC<FileManagerProps> = () => {
               <div className="upload-text">
                 <div>点击或拖拽文件到此处上传</div>
                 <div className="upload-hint">支持单个或批量上传，最大 10MB</div>
+                {uploadOptions.isPrivate && (
+                  <div className="upload-hint" style={{ color: '#ff4d4f', marginTop: 4 }}>
+                    🔒 当前为私密文件模式
+                  </div>
+                )}
               </div>
             </div>
           </Upload.Dragger>
@@ -480,6 +736,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
                 找到 {filteredFiles.length} 个文件
                 {filters.keyword && ` (搜索: "${filters.keyword}")`}
                 {filters.fileType !== 'all' && ` (类型: ${filters.fileType})`}
+                {fileStats.privateFiles > 0 && ` (${fileStats.privateFiles} 个私密文件)`}
               </div>
               <div className="file-grid-container">
                 <Row gutter={[16, 16]} className="file-grid">
@@ -491,6 +748,10 @@ const FileManager: React.FC<FileManagerProps> = () => {
                           <span className="file-name" title={file.name}>
                             {file.name}
                           </span>
+                          {/* 私密文件标识 */}
+                          {file.isPrivate && (
+                            <LockOutlined style={{ color: '#ff4d4f', marginLeft: 8 }} />
+                          )}
                         </div>
                         <div className="file-info">
                           <div className="file-meta">
@@ -512,6 +773,12 @@ const FileManager: React.FC<FileManagerProps> = () => {
                                  file.category === 'video' ? '视频' :
                                  file.category === 'archive' ? '压缩包' : '其他'}
                               </Tag>
+                              {/* 私密文件标签 */}
+                              {file.isPrivate && (
+                                <Tag color="red" icon={<LockOutlined />}>
+                                  私密
+                                </Tag>
+                              )}
                             </div>
                           </div>
                           <div className="file-actions">
@@ -524,6 +791,18 @@ const FileManager: React.FC<FileManagerProps> = () => {
                               disabled={!!downloading}
                             >
                               下载
+                            </Button>
+                            <Button
+                              type="link"
+                              icon={<ShareAltOutlined />}
+                              onClick={() => {
+                                setSelectedFile(file);
+                                setShareModalVisible(true);
+                              }}
+                              title="分享"
+                              disabled={!!downloading}
+                            >
+                              分享
                             </Button>
                             <Button
                               type="link"
@@ -546,6 +825,15 @@ const FileManager: React.FC<FileManagerProps> = () => {
           )}
         </div>
       </Card>
+
+      {/* 分享模态框 */}
+      {selectedFile && (
+        <ShareModal
+          file={selectedFile}
+          visible={shareModalVisible}
+          onClose={() => setShareModalVisible(false)}
+        />
+      )}
     </div>
   );
 };

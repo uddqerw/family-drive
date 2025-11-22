@@ -20,6 +20,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"github.com/gorilla/websocket"
 	_ "github.com/go-sql-driver/mysql"
+        // "github.com/gin-gonic/gin"
 )
 
 // 聊天消息结构
@@ -73,7 +74,7 @@ func checkPasswordHash(password, hash string) bool {
 // 初始化数据库
 func initDB() {
 	var err error
-	// 修改为你的 MySQL 配置
+	// MySQL 配置
 	dsn := "root:Root@20160212@tcp(localhost:3306)/family_drive?charset=utf8mb4&parseTime=True"
 	db, err = sql.Open("mysql", dsn)
 	if err != nil {
@@ -740,11 +741,13 @@ func main() {
 	initDB()
 	defer db.Close()
         handlers.SetDB(db)
-        // handlers.SetShareDB(db)      // 🔥 新增：分享链接处理器
-
+        // handlers.SetShareDB(db)
 	// 初始化目录
 	os.MkdirAll("./uploads", 0755)
 	os.MkdirAll("./uploads/voices", 0755)
+
+        // router := gin.Default()
+	// router.LoadHTMLGlob("templates/*")
 	
 	// 添加欢迎消息
 	welcomeMessage := ChatMessage{
@@ -772,10 +775,10 @@ func main() {
         mux.HandleFunc("/api/files/upload", middleware.CORS(handleFileUpload))
         mux.HandleFunc("/api/files/list", middleware.CORS(handleFileList))
         mux.HandleFunc("/api/files/delete/", middleware.CORS(handleFileDelete))
-        mux.HandleFunc("/api/files/share/", middleware.CORS(handlers.GenerateShareLink))
-        mux.HandleFunc("/api/files/shared/", middleware.CORS(handlers.AccessSharedFile))
-        mux.HandleFunc("/api/files/shares", middleware.CORS(handlers.GetShareLinks))
-	mux.HandleFunc("/api/files/share/delete/", middleware.CORS(handlers.DeleteShareLink))
+        mux.HandleFunc("/api/files/share/", middleware.CORS(handlers.CreateShare))
+        mux.HandleFunc("/api/files/shared/", middleware.CORS(handlers.GetSharedFile))
+        // mux.HandleFunc("/api/files/shares", middleware.CORS(handlers.GetShareLinks))
+	// mux.HandleFunc("/api/files/share/delete/", middleware.CORS(handlers.DeleteShareLink))
         mux.HandleFunc("/ws", handleWebSocket)
 
         // 这个需要特殊处理 - 使用 handlers 包函数 + 认证中间件
@@ -783,6 +786,7 @@ func main() {
 
 	// 静态文件服务
 	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
+	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 	
 	log.Println("🚀 家庭网盘 HTTPS 服务器启动成功!")
 	log.Printf("📍 服务地址: https://localhost:%s", port)
