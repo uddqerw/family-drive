@@ -83,6 +83,20 @@ const Login: React.FC<LoginProps> = (props) => {
 
   // 注册处理
   const onRegisterFinish = async (values: any) => {
+    // 🔍 添加详细调试信息
+    console.log('🔍 注册表单完整数据:', JSON.stringify(values, null, 2));
+    console.log('🔍 各个字段值:', {
+      username: values.username,
+      email: values.email, 
+      password: values.password,
+      confirmPassword: values.confirmPassword
+    });
+    console.log('🔍 字段类型:', {
+      username_type: typeof values.username,
+      email_type: typeof values.email,
+      password_type: typeof values.password
+    });
+
     setLoading(true);
     try {
       // 检查密码确认
@@ -92,9 +106,16 @@ const Login: React.FC<LoginProps> = (props) => {
         return;
       }
 
-      console.log('开始注册:', values.email);
+      console.log('开始注册 - 用户名:', values.username, '邮箱:', values.email);
 
-      const response = await authAPI.register(values.email, values.password);
+      // 🔍 调试API调用参数
+      console.log('🔍 调用authAPI.register参数:', {
+        username: values.username,
+        email: values.email,
+        password: values.password
+      });
+
+      const response = await authAPI.register(values.username, values.email, values.password);
       const data = response.data;
 
       console.log('注册API响应:', data);
@@ -261,6 +282,12 @@ const Login: React.FC<LoginProps> = (props) => {
                   onFinish={onRegisterFinish}
                   autoComplete="off"
                   layout="vertical"
+                  initialValues={{ 
+                    username: '',
+                    email: '',
+                    password: '',
+                    confirmPassword: ''
+                  }}
                 >
                   <Form.Item
                     name="username"
@@ -275,6 +302,7 @@ const Login: React.FC<LoginProps> = (props) => {
                       prefix={<UserOutlined />}
                       placeholder="请输入用户名"
                       size="large"
+                      autoComplete="username"
                     />
                   </Form.Item>
 
@@ -290,6 +318,7 @@ const Login: React.FC<LoginProps> = (props) => {
                       prefix={<MailOutlined />}
                       placeholder="请输入邮箱"
                       size="large"
+                      autoComplete="email"
                     />
                   </Form.Item>
 
@@ -306,6 +335,7 @@ const Login: React.FC<LoginProps> = (props) => {
                       prefix={<LockOutlined />}
                       placeholder="请输入密码"
                       size="large"
+                      autoComplete="new-password"
                     />
                   </Form.Item>
 
@@ -328,6 +358,7 @@ const Login: React.FC<LoginProps> = (props) => {
                       prefix={<LockOutlined />}
                       placeholder="请再次输入密码"
                       size="large"
+                      autoComplete="new-password"
                     />
                   </Form.Item>
 

@@ -88,8 +88,8 @@ export const authAPI = {
     api.post('/api/auth/login', { email, password }),
   
   // 用户注册
-  register: (email: string, password: string) => 
-    api.post('/api/auth/register', { email, password }),
+  register: (username: string, email: string, password: string) => 
+    api.post('/api/auth/register', { username, email, password }),
   
   // 刷新Token
   refresh: (refreshToken: string) => 
