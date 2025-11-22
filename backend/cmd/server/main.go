@@ -757,23 +757,25 @@ func main() {
 	chatMessages = append(chatMessages, welcomeMessage)
 
 	// 创建路由
-	mux := http.NewServeMux()
-	
-	// 注册路由
-	mux.HandleFunc("/", handleRoot)
-	mux.HandleFunc("/api/auth/login", handleLogin)
-	mux.HandleFunc("/api/auth/register", handleRegister)
-	mux.HandleFunc("/api/chat/send", handleSendMessage)
-	mux.HandleFunc("/api/chat/messages", handleGetMessages)
-	mux.HandleFunc("/api/chat/clear", handleClearMessages)
-	mux.HandleFunc("/api/chat/voice", handleVoiceUpload)
-	mux.HandleFunc("/api/chat/voice/", handleVoiceDownload)
-	mux.HandleFunc("/api/files/upload", handleFileUpload)
-	mux.HandleFunc("/api/files/list", handleFileList)
-	mux.HandleFunc("/api/files/delete/", handleFileDelete)
-	mux.HandleFunc("/ws", handleWebSocket)
-        mux.HandleFunc("/api/auth/me", middleware.AuthMiddleware(handlers.HandleGetCurrentUser))
-	
+        mux := http.NewServeMux()
+
+        // 注册路由 - 全部使用本地函数 + CORS
+        mux.HandleFunc("/", handleRoot)
+        mux.HandleFunc("/api/auth/login", middleware.CORS(handleLogin))
+        mux.HandleFunc("/api/auth/register", middleware.CORS(handleRegister))
+        mux.HandleFunc("/api/chat/send", middleware.CORS(handleSendMessage))
+        mux.HandleFunc("/api/chat/messages", middleware.CORS(handleGetMessages))
+        mux.HandleFunc("/api/chat/clear", middleware.CORS(handleClearMessages))
+        mux.HandleFunc("/api/chat/voice", middleware.CORS(handleVoiceUpload))
+        mux.HandleFunc("/api/chat/voice/", middleware.CORS(handleVoiceDownload))
+        mux.HandleFunc("/api/files/upload", middleware.CORS(handleFileUpload))
+        mux.HandleFunc("/api/files/list", middleware.CORS(handleFileList))
+        mux.HandleFunc("/api/files/delete/", middleware.CORS(handleFileDelete))
+        mux.HandleFunc("/ws", handleWebSocket)
+
+        // 这个需要特殊处理 - 使用 handlers 包函数 + 认证中间件
+        mux.HandleFunc("/api/auth/me", middleware.AuthMiddleware(handlers.HandleGetCurrentUser))	
+
 	// 静态文件服务
 	mux.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("./uploads"))))
 	
@@ -786,8 +788,12 @@ func main() {
 	log.Printf("⏰ 启动时间: %s", time.Now().Format("2006-01-02 15:04:05"))
 	log.Println("==================================================")
 	
+        // 证书文件路径
+        certFile := "localhost+2.pem"      // 证书文件
+        keyFile := "localhost+2-key.pem"   // 密钥文件
+        
 	// 使用 HTTPS
-	err := http.ListenAndServeTLS(":"+port, mux)
+	err := http.ListenAndServeTLS(":"+port, certFile, keyFile, mux)
 	if err != nil {
 		log.Fatal("HTTPS 服务器启动失败:", err)
 	}

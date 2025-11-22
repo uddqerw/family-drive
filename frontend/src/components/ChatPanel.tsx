@@ -81,7 +81,7 @@ const ChatPanel: React.FC = () => {
 
     setSyncing(true);
     try {
-      const response = await fetch('http://localhost:8000/api/chat/messages');
+      const response = await fetch('https://localhost:8000/api/chat/messages');
 
       if (response.ok) {
         const result = await response.json();
@@ -205,7 +205,7 @@ const ChatPanel: React.FC = () => {
 
       console.log('🎤 发送语音消息，时长:', recordingTime);
 
-      const response = await fetch('http://localhost:8000/api/chat/voice', {
+      const response = await fetch('https://localhost:8000/api/chat/voice', {
         method: 'POST',
         body: formData,
       });
@@ -243,7 +243,7 @@ const ChatPanel: React.FC = () => {
 
   // 播放语音消息
   const playVoiceMessage = (audioUrl: string) => {
-    const fullUrl = audioUrl.startsWith('http') ? audioUrl : `http://localhost:8000${audioUrl}`;
+    const fullUrl = audioUrl.startsWith('http') ? audioUrl : `https://localhost:8000${audioUrl}`;
     const audio = new Audio(fullUrl);
     audio.play().catch(error => {
       console.error('播放失败:', error);
@@ -263,7 +263,7 @@ const ChatPanel: React.FC = () => {
     try {
       const messageId = Date.now();
 
-      const response = await fetch('http://localhost:8000/api/chat/send', {
+      const response = await fetch('https://localhost:8000/api/chat/send', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -300,7 +300,7 @@ const ChatPanel: React.FC = () => {
         clearInterval(syncIntervalRef.current);
       }
 
-      const response = await fetch('http://localhost:8000/api/chat/clear', {
+      const response = await fetch('https://localhost:8000/api/chat/clear', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

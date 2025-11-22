@@ -112,7 +112,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
   const loadFiles = async () => {
     try {
       console.log('🔄 开始加载文件列表...');
-      const response = await fetch('http://localhost:8000/api/files/list');
+      const response = await fetch('https://localhost:8000/api/files/list');
       
       if (response.ok) {
         const result = await response.json();
@@ -191,7 +191,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
 
     try {
       console.log('📤 上传文件:', file.name, '大小:', file.size);
-      const response = await fetch('http://localhost:8000/api/files/upload', {
+      const response = await fetch('https://localhost:8000/api/files/upload', {
         method: 'POST',
         body: formData,
       });
@@ -226,7 +226,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
 
     try {
       // 直接使用 fetch 下载
-      const response = await fetch(`http://localhost:8000/api/files/download/${filename}`);
+      const response = await fetch(`https://localhost:8000/api/files/download/${filename}`);
       
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -280,7 +280,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/api/files/delete/${filename}`, {
+      const response = await fetch(`https://localhost:8000/api/files/delete/${filename}`, {
         method: 'DELETE',
       });
 

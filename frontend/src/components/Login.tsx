@@ -8,6 +8,8 @@ const { Text } = Typography;
 // 定义props接口
 interface LoginProps {
   children?: React.ReactNode;
+  onLoginSuccess?: () => void;
+  onLogout?: () => void;
 }
 
 const Login: React.FC<LoginProps> = (props) => {
@@ -20,41 +22,59 @@ const Login: React.FC<LoginProps> = (props) => {
     const token = localStorage.getItem('access_token');
     const userInfo = localStorage.getItem('user_info');
     console.log('启动时检查登录状态:', { token, userInfo });
-    
+
     if (token && userInfo) {
       try {
         const user = JSON.parse(userInfo);
         console.log('发现已保存的用户信息，自动登录:', user);
         setIsLoggedIn(true);
+        // 通知父组件登录状态
+        if (props.onLoginSuccess) {
+          props.onLoginSuccess();
+        }
       } catch (error) {
         console.error('解析用户信息失败:', error);
         localStorage.removeItem('access_token');
         localStorage.removeItem('user_info');
       }
     }
-  }, []);
+  }, [props.onLoginSuccess]);
 
   // 登录处理
   const onLoginFinish = async (values: any) => {
     setLoading(true);
     try {
       console.log('开始登录:', values.email);
-      
-      const response = await authAPI.login(values.email, values.password);
-      const { access_token, user } = response.data;
-      
-      console.log('登录成功，用户信息:', user);
 
-      // 保存到localStorage
-      localStorage.setItem('access_token', access_token);
-      localStorage.setItem('user_info', JSON.stringify(user));
+      const response = await authAPI.login(values.email, values.password);
+      const data = response.data;
       
-      message.success(`欢迎回来，${user.username}！`);
-      setIsLoggedIn(true);
+      console.log('登录API响应:', data);
+
+      if (data.success) {
+        const { access_token, user } = data.data;
+
+        console.log('登录成功，用户信息:', user);
+
+        // 保存到localStorage
+        localStorage.setItem('access_token', access_token);
+        localStorage.setItem('user_info', JSON.stringify(user));
+
+        message.success(`欢迎回来，${user.username}！`);
+        setIsLoggedIn(true);
+        
+        // 🔥 调用父组件的登录成功回调
+        if (props.onLoginSuccess) {
+          props.onLoginSuccess();
+        }
+
+      } else {
+        throw new Error(data.message);
+      }
 
     } catch (error: any) {
       console.error('登录失败:', error);
-      const errorMessage = error.response?.data?.message || error.response?.data?.error || '登录失败，请检查网络连接';
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || '登录失败，请检查网络连接';
       message.error(errorMessage);
     } finally {
       setLoading(false);
@@ -73,27 +93,33 @@ const Login: React.FC<LoginProps> = (props) => {
       }
 
       console.log('开始注册:', values.email);
-      
-      const response = await authAPI.register(values.username, values.email, values.password);
-      
-      console.log('注册成功:', response.data);
-      message.success('注册成功！请登录');
 
-      // 注册成功后切换到登录标签
-      setActiveTab('login');
+      const response = await authAPI.register(values.email, values.password);
+      const data = response.data;
 
-      // 自动填充登录表单（可选）
-      const loginForm = document.querySelector('form[name="login"]') as HTMLFormElement;
-      if (loginForm) {
-        const emailInput = loginForm.querySelector('input[name="email"]') as HTMLInputElement;
-        if (emailInput) {
-          emailInput.value = values.email;
+      console.log('注册API响应:', data);
+
+      if (data.success) {
+        message.success('注册成功！请登录');
+
+        // 注册成功后切换到登录标签
+        setActiveTab('login');
+
+        // 自动填充登录表单（可选）
+        const loginForm = document.querySelector('form[name="login"]') as HTMLFormElement;
+        if (loginForm) {
+          const emailInput = loginForm.querySelector('input[name="email"]') as HTMLInputElement;
+          if (emailInput) {
+            emailInput.value = values.email;
+          }
         }
+      } else {
+        throw new Error(data.message);
       }
 
     } catch (error: any) {
       console.error('注册失败:', error);
-      const errorMessage = error.response?.data?.message || error.response?.data?.error || '注册失败，请重试';
+      const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message || '注册失败，请重试';
       message.error(errorMessage);
     } finally {
       setLoading(false);
@@ -105,13 +131,19 @@ const Login: React.FC<LoginProps> = (props) => {
     localStorage.removeItem('access_token');
     localStorage.removeItem('user_info');
     setIsLoggedIn(false);
+    
+    // 🔥 调用父组件的退出回调
+    if (props.onLogout) {
+      props.onLogout();
+    }
+    
     message.success('已退出登录');
   };
 
   // 如果已登录，显示子组件和用户信息
   if (isLoggedIn) {
     const userInfo = JSON.parse(localStorage.getItem('user_info') || '{}');
-    
+
     return (
       <div>
         {/* 用户信息栏 */}
@@ -132,7 +164,7 @@ const Login: React.FC<LoginProps> = (props) => {
             退出登录
           </Button>
         </div>
-        
+
         {/* 主内容 */}
         {props.children}
       </div>
@@ -148,14 +180,14 @@ const Login: React.FC<LoginProps> = (props) => {
       height: '100vh',
       background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
     }}>
-      <Card 
+      <Card
         title={
           <Space>
             <SafetyCertificateOutlined />
             <span>🏠 家庭网盘</span>
           </Space>
-        } 
-        style={{ 
+        }
+        style={{
           width: 420,
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)'
         }}
@@ -165,52 +197,52 @@ const Login: React.FC<LoginProps> = (props) => {
           fontWeight: 'bold'
         }}
       >
-        <Tabs 
-          activeKey={activeTab} 
+        <Tabs
+          activeKey={activeTab}
           onChange={setActiveTab}
           items={[
             {
               key: 'login',
               label: '登录',
               children: (
-                <Form 
-                  name="login" 
-                  onFinish={onLoginFinish} 
+                <Form
+                  name="login"
+                  onFinish={onLoginFinish}
                   autoComplete="off"
                   layout="vertical"
                 >
-                  <Form.Item 
-                    name="email" 
+                  <Form.Item
+                    name="email"
                     label="邮箱"
                     rules={[
                       { required: true, message: '请输入邮箱!' },
                       { type: 'email', message: '请输入有效的邮箱地址!' }
                     ]}
                   >
-                    <Input 
-                      prefix={<MailOutlined />} 
-                      placeholder="请输入邮箱" 
+                    <Input
+                      prefix={<MailOutlined />}
+                      placeholder="请输入邮箱"
                       size="large"
                     />
                   </Form.Item>
 
-                  <Form.Item 
+                  <Form.Item
                     name="password"
-                    label="密码" 
+                    label="密码"
                     rules={[{ required: true, message: '请输入密码!' }]}
                   >
-                    <Input.Password 
-                      prefix={<LockOutlined />} 
-                      placeholder="请输入密码" 
+                    <Input.Password
+                      prefix={<LockOutlined />}
+                      placeholder="请输入密码"
                       size="large"
                     />
                   </Form.Item>
 
                   <Form.Item>
-                    <Button 
-                      type="primary" 
-                      htmlType="submit" 
-                      loading={loading} 
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={loading}
                       style={{ width: '100%' }}
                       size="large"
                     >
@@ -224,14 +256,14 @@ const Login: React.FC<LoginProps> = (props) => {
               key: 'register',
               label: '注册',
               children: (
-                <Form 
-                  name="register" 
-                  onFinish={onRegisterFinish} 
+                <Form
+                  name="register"
+                  onFinish={onRegisterFinish}
                   autoComplete="off"
                   layout="vertical"
                 >
-                  <Form.Item 
-                    name="username" 
+                  <Form.Item
+                    name="username"
                     label="用户名"
                     rules={[
                       { required: true, message: '请输入用户名!' },
@@ -239,30 +271,30 @@ const Login: React.FC<LoginProps> = (props) => {
                       { max: 20, message: '用户名不能超过20个字符!' }
                     ]}
                   >
-                    <Input 
-                      prefix={<UserOutlined />} 
-                      placeholder="请输入用户名" 
+                    <Input
+                      prefix={<UserOutlined />}
+                      placeholder="请输入用户名"
                       size="large"
                     />
                   </Form.Item>
 
-                  <Form.Item 
-                    name="email" 
+                  <Form.Item
+                    name="email"
                     label="邮箱"
                     rules={[
                       { required: true, message: '请输入邮箱!' },
                       { type: 'email', message: '请输入有效的邮箱地址!' }
                     ]}
                   >
-                    <Input 
-                      prefix={<MailOutlined />} 
-                      placeholder="请输入邮箱" 
+                    <Input
+                      prefix={<MailOutlined />}
+                      placeholder="请输入邮箱"
                       size="large"
                     />
                   </Form.Item>
 
-                  <Form.Item 
-                    name="password" 
+                  <Form.Item
+                    name="password"
                     label="密码"
                     rules={[
                       { required: true, message: '请输入密码!' },
@@ -270,30 +302,40 @@ const Login: React.FC<LoginProps> = (props) => {
                       { pattern: /^(?=.*[A-Za-z])(?=.*\d)/, message: '密码必须包含字母和数字!' }
                     ]}
                   >
-                    <Input.Password 
-                      prefix={<LockOutlined />} 
-                      placeholder="请输入密码" 
+                    <Input.Password
+                      prefix={<LockOutlined />}
+                      placeholder="请输入密码"
                       size="large"
                     />
                   </Form.Item>
 
-                  <Form.Item 
-                    name="confirmPassword" 
+                  <Form.Item
+                    name="confirmPassword"
                     label="确认密码"
-                    rules={[{ required: true, message: '请确认密码!' }]}
+                    rules={[
+                      { required: true, message: '请确认密码!' },
+                      ({ getFieldValue }) => ({
+                        validator(_, value) {
+                          if (!value || getFieldValue('password') === value) {
+                            return Promise.resolve();
+                          }
+                          return Promise.reject(new Error('两次输入的密码不一致!'));
+                        },
+                      }),
+                    ]}
                   >
-                    <Input.Password 
-                      prefix={<LockOutlined />} 
-                      placeholder="请再次输入密码" 
+                    <Input.Password
+                      prefix={<LockOutlined />}
+                      placeholder="请再次输入密码"
                       size="large"
                     />
                   </Form.Item>
 
                   <Form.Item>
-                    <Button 
-                      type="primary" 
-                      htmlType="submit" 
-                      loading={loading} 
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      loading={loading}
                       style={{ width: '100%' }}
                       size="large"
                     >
@@ -306,15 +348,15 @@ const Login: React.FC<LoginProps> = (props) => {
           ]}
         />
 
-        <div style={{ 
-          textAlign: 'center', 
-          marginTop: 16, 
+        <div style={{
+          textAlign: 'center',
+          marginTop: 16,
           color: '#666',
           fontSize: '14px'
         }}>
           {activeTab === 'login' ? '还没有账号？' : '已有账号？'}
-          <Button 
-            type="link" 
+          <Button
+            type="link"
             onClick={() => setActiveTab(activeTab === 'login' ? 'register' : 'login')}
             style={{ padding: '0 4px', height: 'auto', fontWeight: 'bold' }}
           >
@@ -333,8 +375,7 @@ const Login: React.FC<LoginProps> = (props) => {
           color: '#52c41a'
         }}>
           <div><strong>演示账号：</strong></div>
-          <div>邮箱: baba@family.com | 密码: 123456</div>
-          <div>邮箱: mama@family.com | 密码: 123456</div>
+          <div>邮箱: test@example.com | 密码: 123456</div>
         </div>
       </Card>
     </div>
