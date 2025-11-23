@@ -741,7 +741,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
               <div className="file-grid-container">
                 <Row gutter={[16, 16]} className="file-grid">
                   {filteredFiles.map((file, index) => (
-                    <Col xs={24} sm={12} md={8} lg={6} key={file.id || index}>
+                    <Col xs={24} sm={12} md={8} lg={6} key={`${file.name}-${file.id || index}-${file.uploadTime}`}>
                       <div className="file-card">
                         <div className="file-header">
                           {getFileIcon(file.name)}

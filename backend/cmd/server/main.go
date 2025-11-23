@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"net/url"
 
         "familydrive/handlers"
         "familydrive/middleware"
@@ -58,6 +59,25 @@ var (
 		},
 	}
 )
+
+// CORS 中间件
+func enableCORS(next http.HandlerFunc) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        // 设置 CORS 头
+        w.Header().Set("Access-Control-Allow-Origin", "*")
+        w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
+        
+        // 处理预检请求
+        if r.Method == "OPTIONS" {
+            w.WriteHeader(http.StatusOK)
+            return
+        }
+        
+        // 调用下一个处理器
+        next(w, r)
+    }
+}
 
 // 密码加密
 func hashPassword(password string) (string, error) {
@@ -649,6 +669,48 @@ func handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// 文件下载处理函数
+func handleFileDownload(w http.ResponseWriter, r *http.Request) {
+    // 设置 CORS 头
+    w.Header().Set("Access-Control-Allow-Origin", "*")
+    
+    // 从 URL 路径获取文件名
+    path := r.URL.Path
+    prefix := "/api/files/download/"
+    
+    if !strings.HasPrefix(path, prefix) {
+        http.Error(w, `{"error":"invalid path"}`, http.StatusBadRequest)
+        return
+    }
+    
+    fileName := path[len(prefix):]
+    if fileName == "" {
+        http.Error(w, `{"error":"filename required"}`, http.StatusBadRequest)
+        return
+    }
+
+    // URL 解码文件名
+    decodedFileName, err := url.QueryUnescape(fileName)
+    if err == nil {
+        fileName = decodedFileName
+    }
+
+    filePath := filepath.Join("./uploads", fileName)
+
+    // 检查文件是否存在
+    if _, err := os.Stat(filePath); os.IsNotExist(err) {
+        http.Error(w, `{"error":"file not found"}`, http.StatusNotFound)
+        return
+    }
+
+    // 设置下载头信息
+    w.Header().Set("Content-Disposition", "attachment; filename="+fileName)
+    w.Header().Set("Content-Type", "application/octet-stream")
+    
+    // 提供文件下载
+    http.ServeFile(w, r, filePath)
+}
+
 // 文件列表处理
 func handleFileList(w http.ResponseWriter, r *http.Request) {
 	log.Printf("📁 返回文件列表")
@@ -773,6 +835,7 @@ func main() {
         mux.HandleFunc("/api/chat/voice", middleware.CORS(handleVoiceUpload))
         mux.HandleFunc("/api/chat/voice/", middleware.CORS(handleVoiceDownload))
         mux.HandleFunc("/api/files/upload", middleware.CORS(handleFileUpload))
+        mux.HandleFunc("/api/files/download/", middleware.CORS(handleFileDownload))
         mux.HandleFunc("/api/files/list", middleware.CORS(handleFileList))
         mux.HandleFunc("/api/files/delete/", middleware.CORS(handleFileDelete))
         mux.HandleFunc("/api/files/share/", middleware.CORS(handlers.CreateShare))

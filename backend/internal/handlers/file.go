@@ -1,8 +1,6 @@
 package handlers
 
 import (
-    "database/sql"
-    "encoding/json"
     "fmt"
     "io"
     "log"
@@ -12,7 +10,6 @@ import (
     "path/filepath"
     "strconv"
     "strings"
-    "time"
 )
 
 // 文件信息结构
@@ -22,7 +19,7 @@ type FileInfo struct {
     Size      int64  `json:"size"`
     CreatedAt string `json:"created_at"`
     OwnerID   int64  `json:"owner_id"`
-    IsPrivate bool   `json:"isPrivate"` // 🆕 添加私密文件标识
+    IsPrivate bool   `json:"isPrivate"`
 }
 
 // 上传文件
@@ -48,7 +45,7 @@ func HandleFileUpload(w http.ResponseWriter, r *http.Request) {
     }
     defer file.Close()
 
-    // 🆕 获取私密文件选项
+    // 获取私密文件选项
     isPrivate := r.FormValue("is_private") == "true"
     sharePassword := r.FormValue("share_password")
 
@@ -72,18 +69,15 @@ func HandleFileUpload(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // 🆕 保存到 share_links 表（创建分享链接）
-    shareID := generateShareID()
-    expiresAt := time.Now().Add(24 * 365 * time.Hour) // 1年有效期
-
-    _, err = db.Exec(`
-        INSERT INTO share_links (id, filename, password, expires_at, max_access, access_count, user_id, created_at, is_private, share_password) 
-        VALUES (?, ?, ?, ?, 0, 0, ?, NOW(), ?, ?)
-    `, shareID, header.Filename, sharePassword, expiresAt, uid, isPrivate, sharePassword)
-
-    if err != nil {
-        log.Printf("创建分享链接失败: %v", err)
-        // 不返回错误，因为文件已经上传成功
+    // 🆕 如果是私密文件，创建密码标记文件
+    if isPrivate && sharePassword != "" {
+        privateFilePath := filepath.Join(uploadDir, "."+header.Filename+".private")
+        err = os.WriteFile(privateFilePath, []byte(sharePassword), 0644)
+        if err != nil {
+            log.Printf("创建私密标记文件失败: %v", err)
+        } else {
+            log.Printf("✅ 私密文件标记创建成功: %s", header.Filename)
+        }
     }
 
     writeJSON(w, http.StatusOK, map[string]interface{}{
@@ -91,8 +85,7 @@ func HandleFileUpload(w http.ResponseWriter, r *http.Request) {
         "file":    header.Filename,
         "size":    strconv.FormatInt(header.Size, 10),
         "owner_id": strconv.FormatInt(uid, 10),
-        "isPrivate": isPrivate, // 🆕 返回私密状态
-        "share_url": fmt.Sprintf("https://localhost:8000/api/files/shared/%s", shareID), // 🆕 返回分享链接
+        "isPrivate": isPrivate,
     })
 }
 
@@ -104,6 +97,7 @@ func HandleFileList(w http.ResponseWriter, r *http.Request) {
         writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
         return
     }
+    _ = uid // 使用变量避免编译警告
 
     uploadDir := "./uploads"
 
@@ -124,25 +118,25 @@ func HandleFileList(w http.ResponseWriter, r *http.Request) {
     var fileList []FileInfo
     for _, file := range files {
         if !file.IsDir() {
+            // 🆕 跳过私密标记文件
+            if strings.HasPrefix(file.Name(), ".") && strings.HasSuffix(file.Name(), ".private") {
+                continue
+            }
+            
             info, err := file.Info()
             if err == nil {
-                // 🆕 查询文件的私密状态
-                var isPrivate bool
-                err := db.QueryRow(`
-                    SELECT is_private FROM share_links 
-                    WHERE filename = ? AND user_id = ? 
-                    ORDER BY created_at DESC LIMIT 1
-                `, file.Name(), uid).Scan(&isPrivate)
+                // 🆕 检查是否为私密文件
+                privateFilePath := filepath.Join(uploadDir, "."+file.Name()+".private")
+                isPrivate := false
                 
-                // 如果查询失败，默认为非私密
-                if err != nil {
-                    isPrivate = false
+                if _, err := os.Stat(privateFilePath); err == nil {
+                    isPrivate = true
                 }
 
                 fileList = append(fileList, FileInfo{
                     Name:      file.Name(),
                     Size:      info.Size(),
-                    IsPrivate: isPrivate, // 🆕 添加私密标识
+                    IsPrivate: isPrivate,
                 })
             }
         }
@@ -154,7 +148,7 @@ func HandleFileList(w http.ResponseWriter, r *http.Request) {
 // 下载文件
 func HandleFileDownload(w http.ResponseWriter, r *http.Request) {
     // 验证用户认证
-    uid, err := getAuthUserID(r)
+    _, err := getAuthUserID(r)
     if err != nil {
         writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
         return
@@ -175,19 +169,20 @@ func HandleFileDownload(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // 🆕 查询文件的私密状态和密码
-    var isPrivate bool
-    var sharePassword string
-    err = db.QueryRow(`
-        SELECT is_private, share_password FROM share_links 
-        WHERE filename = ? AND user_id = ? 
-        ORDER BY created_at DESC LIMIT 1
-    `, fileName, uid).Scan(&isPrivate, &sharePassword)
-
-    // 🆕 如果是私密文件，验证密码
-    if err == nil && isPrivate && sharePassword != "" {
+    // 🆕 检查是否为私密文件
+    privateFilePath := filepath.Join("./uploads", "."+fileName+".private")
+    if _, err := os.Stat(privateFilePath); err == nil {
+        // 是私密文件，需要密码验证
         providedPassword := r.URL.Query().Get("password")
         
+        // 读取存储的密码
+        storedPassword, err := os.ReadFile(privateFilePath)
+        if err != nil {
+            log.Printf("读取私密文件密码失败: %v", err)
+            writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "服务器错误"})
+            return
+        }
+
         // 如果没提供密码，返回密码输入页面
         if providedPassword == "" {
             http.Redirect(w, r, 
@@ -198,7 +193,7 @@ func HandleFileDownload(w http.ResponseWriter, r *http.Request) {
         }
 
         // 验证密码
-        if providedPassword != sharePassword {
+        if providedPassword != string(storedPassword) {
             http.Redirect(w, r, 
                 fmt.Sprintf("/static/file_password.html?filename=%s&error=%s", 
                     url.QueryEscape(fileName),
@@ -219,7 +214,7 @@ func HandleFileDownload(w http.ResponseWriter, r *http.Request) {
 // 删除文件
 func HandleFileDelete(w http.ResponseWriter, r *http.Request) {
     // 验证用户认证
-    uid, err := getAuthUserID(r)
+    _, err := getAuthUserID(r)
     if err != nil {
         writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
         return
@@ -240,10 +235,10 @@ func HandleFileDelete(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // 🆕 删除分享链接记录
-    _, err = db.Exec("DELETE FROM share_links WHERE filename = ? AND user_id = ?", fileName, uid)
-    if err != nil {
-        log.Printf("删除分享链接失败: %v", err)
+    // 🆕 删除私密标记文件（如果存在）
+    privateFilePath := filepath.Join("./uploads", "."+fileName+".private")
+    if _, err := os.Stat(privateFilePath); err == nil {
+        os.Remove(privateFilePath)
     }
 
     // 删除文件
@@ -259,14 +254,8 @@ func HandleFileDelete(w http.ResponseWriter, r *http.Request) {
     })
 }
 
-// 🆕 辅助函数 - 生成分享ID
-func generateShareID() string {
-    return fmt.Sprintf("%x", time.Now().UnixNano())[:12]
-}
-
-// 🆕 辅助函数 - 写入JSON响应
-func writeJSON(w http.ResponseWriter, status int, data interface{}) {
-    w.Header().Set("Content-Type", "application/json")
-    w.WriteHeader(status)
-    json.NewEncoder(w).Encode(data)
-}
+// 辅助函数 - 获取认证用户ID
+// func getAuthUserID(r *http.Request) (int64, error) {
+    // 简化：暂时返回固定用户ID
+    // return 1, nil
+// }
