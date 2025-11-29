@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   Button, Upload, message, Card,
   Row, Col, Tag, Progress, Alert,
-  Input, Select, Space, Checkbox, Modal
+  Input, Select, Space, Modal
 } from 'antd';
 import {
   UploadOutlined, DownloadOutlined, DeleteOutlined,
@@ -225,10 +225,10 @@ const FileManager: React.FC<FileManagerProps> = () => {
   });
   
   // 添加上传选项状态
-  const [uploadOptions, setUploadOptions] = useState({
-    isPrivate: false,
-    sharePassword: ''
-  });
+  // const [uploadOptions, setUploadOptions] = useState({
+  //   isPrivate: false,
+  //   sharePassword: ''
+  // });
   
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
@@ -416,13 +416,13 @@ const FileManager: React.FC<FileManagerProps> = () => {
     const formData = new FormData();
     formData.append('file', file);
     
-    if (uploadOptions.isPrivate && uploadOptions.sharePassword) {
-      formData.append('is_private', 'true');
-      formData.append('share_password', uploadOptions.sharePassword);
-    }
+    // if (uploadOptions.isPrivate && uploadOptions.sharePassword) {
+    //    formData.append('is_private', 'true');
+    //    formData.append('share_password', uploadOptions.sharePassword);
+    // }
 
     try {
-      console.log('📤 上传文件:', file.name, '私密:', uploadOptions.isPrivate);
+      console.log('📤 上传文件:', file.name, '私密:');
       const response = await fetch('https://localhost:8000/api/files/upload', {
         method: 'POST',
         body: formData,
@@ -433,15 +433,14 @@ const FileManager: React.FC<FileManagerProps> = () => {
         console.log('✅ 上传成功:', result);
         
         message.success(
-          uploadOptions.isPrivate 
-            ? `🔒 文件 "${file.name}" 上传成功（私密文件）`
+          result.message || result.success ? `✅ 文件 "${file.name}" 上传成功`
             : `✅ 文件 "${file.name}" 上传成功`
         );
         
-        setUploadOptions({
-          isPrivate: false,
-          sharePassword: ''
-        });
+        // ({
+        //   isPrivate: false,
+        //   sharePassword: ''
+        // });
         
         await loadFiles();
       } else {
@@ -687,7 +686,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
         )}
 
         {/* 上传选项 */}
-        <div className="upload-options" style={{ 
+        {/* <div className="upload-options" style={{ 
           margin: '16px', 
           padding: '16px', 
           background: '#f8f9fa', 
@@ -728,7 +727,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
             )}
           </Space>
         </div>
-
+        */}
         {/* 上传区域 */}
         <div className="upload-section">
           <Upload.Dragger
@@ -743,11 +742,11 @@ const FileManager: React.FC<FileManagerProps> = () => {
               <div className="upload-text">
                 <div>点击或拖拽文件到此处上传</div>
                 <div className="upload-hint">支持单个或批量上传，最大 10MB</div>
-                {uploadOptions.isPrivate && (
+                {/* {uploadOptions.isPrivate && (
                   <div className="upload-hint" style={{ color: '#ff4d4f', marginTop: 4 }}>
                     🔒 当前为私密文件模式
                   </div>
-                )}
+                )} */}
               </div>
             </div>
           </Upload.Dragger>
