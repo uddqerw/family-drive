@@ -435,3 +435,108 @@
     background: rgba(149, 222, 100, 0.1);
   }
 }
+/* ===== 删除按钮优化样式 ===== */
+
+/* 文件操作按钮容器优化 */
+.file-actions {
+  display: flex;
+  gap: 4px; /* 进一步减少间距 */
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* 所有操作按钮统一缩小 */
+.file-actions .ant-btn {
+  flex: 1;
+  padding: 2px 4px !important; /* 减小内边距 */
+  height: 24px !important; /* 固定高度 */
+  line-height: 1 !important; /* 调整行高 */
+  font-size: 11px !important; /* 缩小字体 */
+  min-width: auto !important; /* 取消最小宽度 */
+  border-radius: 4px !important; /* 圆角 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+/* 按钮图标调整 */
+.file-actions .ant-btn .anticon {
+  font-size: 12px !important; /* 图标缩小 */
+  margin-right: 0 !important; /* 移除图标右边距 */
+}
+
+/* 下载按钮样式 */
+.file-actions .ant-btn:not(.ant-btn-dangerous):first-child {
+  color: #1890ff;
+  background: rgba(24, 144, 255, 0.06);
+  border: 1px solid rgba(24, 144, 255, 0.3);
+}
+
+.file-actions .ant-btn:not(.ant-btn-dangerous):first-child:hover {
+  background: rgba(24, 144, 255, 0.12);
+  border-color: #1890ff;
+}
+
+/* 分享按钮样式 */
+.file-actions .ant-btn:not(.ant-btn-dangerous):nth-child(2) {
+  color: #52c41a;
+  background: rgba(82, 196, 26, 0.06);
+  border: 1px solid rgba(82, 196, 26, 0.3);
+}
+
+.file-actions .ant-btn:not(.ant-btn-dangerous):nth-child(2):hover {
+  background: rgba(82, 196, 26, 0.12);
+  border-color: #52c41a;
+}
+
+/* 删除按钮特殊样式 - 更明显的危险标识 */
+.file-actions .ant-btn-dangerous {
+  color: #ff4d4f !important;
+  background: rgba(255, 77, 79, 0.06) !important; /* 浅红色背景 */
+  border: 1px solid rgba(255, 77, 79, 0.3) !important;
+  font-weight: 500; /* 加粗文字 */
+}
+
+.file-actions .ant-btn-dangerous:hover {
+  background: rgba(255, 77, 79, 0.12) !important; /* 悬停时稍深 */
+  border-color: #ff4d4f !important;
+  transform: scale(0.98); /* 点击反馈 */
+}
+
+/* 禁用状态 */
+.file-actions .ant-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .file-actions {
+    gap: 2px;
+  }
+  
+  .file-actions .ant-btn {
+    padding: 1px 2px !important;
+    height: 22px !important;
+    font-size: 10px !important;
+  }
+  
+  .file-actions .ant-btn .anticon {
+    font-size: 11px !important;
+  }
+}
+
+/* 可选：只显示图标的版本（如果需要更简洁） */
+/*
+.file-actions .ant-btn span:not(.anticon) {
+  display: none; 
+}
+
+.file-actions .ant-btn {
+  width: 28px;
+  min-width: 28px !important;
+}
+*/

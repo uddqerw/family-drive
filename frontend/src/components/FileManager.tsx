@@ -16,7 +16,16 @@ import './FileManager.css';
 const { Search } = Input;
 const { Option } = Select;
 const { confirm } = Modal;
-
+/*
+const FileManager: React.FC<FileManagerProps> = () => {
+  // 添加调试代码
+  useEffect(() => {
+    console.log('🔧 组件加载完成');
+    console.log('Modal:', Modal);
+    console.log('confirm:', confirm);
+  }, []);
+};
+*/
 // 文件类型图标映射
 const fileIcons = {
   'pdf': <FilePdfOutlined style={{ color: '#ff4d4f' }} />,
@@ -224,6 +233,9 @@ const FileManager: React.FC<FileManagerProps> = () => {
   const [shareModalVisible, setShareModalVisible] = useState(false);
   const [selectedFile, setSelectedFile] = useState<FileItem | null>(null);
 
+  // 使用 ref 来存储删除按钮的引用
+  // （已移除未使用的引用变量 deleteButtonRefs）
+
   // 获取文件分类
   const getFileCategory = (filename: string): FileItem['category'] => {
     const ext = filename.split('.').pop()?.toLowerCase() || '';
@@ -302,11 +314,10 @@ const FileManager: React.FC<FileManagerProps> = () => {
           setFiles(filesWithCategory);
           console.log('✅ 加载成功，文件数:', filesWithCategory.length);
         } else {
-          // 如果返回格式不符合预期，使用空数组
           setFiles([]);
         }
       } else {
-        console.log('❌ HTTP请求失败');
+        console.log('❌ HTTPS 请求失败');
         message.error('加载文件列表失败');
       }
     } catch (error) {
@@ -315,23 +326,64 @@ const FileManager: React.FC<FileManagerProps> = () => {
     }
   };
 
+  /*
+  useEffect(() => {
+    const setupDeleteButtonListeners = () => {
+      Object.values(deleteButtonRefs.current).forEach(button => {
+        if (button) {
+          // 移除现有的事件监听器
+          button.replaceWith(button.cloneNode(true));
+        }
+      });
+
+      // 重新设置引用
+      deleteButtonRefs.current = {};
+
+      // 为所有删除按钮设置新的监听器
+      document.querySelectorAll('[data-filename]').forEach(button => {
+        const filename = button.getAttribute('data-filename');
+        if (filename) {
+          deleteButtonRefs.current[filename] = button as HTMLButtonElement;
+          
+          button.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            console.log('🎯 原生事件删除点击:', filename);
+            handleDelete(filename);
+          }, true); // 使用捕获阶段
+        }
+      });
+    };
+
+    // 延迟设置以确保 DOM 已更新
+    setTimeout(setupDeleteButtonListeners, 0);
+
+    return () => {
+      // 清理事件监听器
+      Object.values(deleteButtonRefs.current).forEach(button => {
+        if (button) {
+          button.replaceWith(button.cloneNode(true));
+        }
+      });
+    };
+  }, [files]); // 当文件列表更新时重新设置
+*/
+
   // 过滤和排序文件
   const filteredFiles = useMemo(() => {
     let result = [...files];
 
-    // 关键词搜索
     if (filters.keyword) {
       result = result.filter(file =>
         file.name.toLowerCase().includes(filters.keyword.toLowerCase())
       );
     }
 
-    // 文件类型过滤
     if (filters.fileType !== 'all') {
       result = result.filter(file => file.category === filters.fileType);
     }
 
-    // 排序
     result.sort((a, b) => {
       let comparison = 0;
 
@@ -364,7 +416,6 @@ const FileManager: React.FC<FileManagerProps> = () => {
     const formData = new FormData();
     formData.append('file', file);
     
-    // 添加私密文件选项
     if (uploadOptions.isPrivate && uploadOptions.sharePassword) {
       formData.append('is_private', 'true');
       formData.append('share_password', uploadOptions.sharePassword);
@@ -381,20 +432,18 @@ const FileManager: React.FC<FileManagerProps> = () => {
         const result = await response.json();
         console.log('✅ 上传成功:', result);
         
-        // 根据是否私密显示不同消息
         message.success(
           uploadOptions.isPrivate 
             ? `🔒 文件 "${file.name}" 上传成功（私密文件）`
             : `✅ 文件 "${file.name}" 上传成功`
         );
         
-        // 重置上传选项
         setUploadOptions({
           isPrivate: false,
           sharePassword: ''
         });
         
-        await loadFiles(); // 重新加载文件列表
+        await loadFiles();
       } else {
         const errorText = await response.text();
         console.error('❌ 上传失败:', errorText);
@@ -421,7 +470,6 @@ const FileManager: React.FC<FileManagerProps> = () => {
     });
 
     try {
-      // 使用 encodeURIComponent 处理文件名
       const response = await fetch(`https://localhost:8000/api/files/download/${encodeURIComponent(filename)}`);
 
       if (!response.ok) {
@@ -488,7 +536,7 @@ const FileManager: React.FC<FileManagerProps> = () => {
             const result = await response.json();
             console.log('✅ 删除成功:', result);
             message.success(`文件 "${filename}" 删除成功`);
-            await loadFiles(); // 重新加载文件列表
+            await loadFiles();
           } else {
             const errorText = await response.text();
             console.error('❌ 删除失败:', errorText);
@@ -561,7 +609,6 @@ const FileManager: React.FC<FileManagerProps> = () => {
         {/* 搜索和筛选工具栏 */}
         <div className="search-toolbar">
           <Space wrap size="middle" style={{ width: '100%' }}>
-            {/* 搜索框 */}
             <Search
               placeholder="搜索文件名..."
               value={filters.keyword}
@@ -571,7 +618,6 @@ const FileManager: React.FC<FileManagerProps> = () => {
               enterButton={<SearchOutlined />}
             />
 
-            {/* 文件类型过滤 */}
             <Select
               value={filters.fileType}
               onChange={(value) => handleFilterChange('fileType', value)}
@@ -585,7 +631,6 @@ const FileManager: React.FC<FileManagerProps> = () => {
               <Option value="other">其他</Option>
             </Select>
 
-            {/* 排序方式 */}
             <Select
               value={filters.sortBy}
               onChange={(value) => handleFilterChange('sortBy', value)}
@@ -597,7 +642,6 @@ const FileManager: React.FC<FileManagerProps> = () => {
               <Option value="type">按类型</Option>
             </Select>
 
-            {/* 排序顺序 */}
             <Select
               value={filters.sortOrder}
               onChange={(value) => handleFilterChange('sortOrder', value)}
@@ -748,7 +792,6 @@ const FileManager: React.FC<FileManagerProps> = () => {
                           <span className="file-name" title={file.name}>
                             {file.name}
                           </span>
-                          {/* 私密文件标识 */}
                           {file.isPrivate && (
                             <LockOutlined style={{ color: '#ff4d4f', marginLeft: 8 }} />
                           )}
@@ -773,7 +816,6 @@ const FileManager: React.FC<FileManagerProps> = () => {
                                  file.category === 'video' ? '视频' :
                                  file.category === 'archive' ? '压缩包' : '其他'}
                               </Tag>
-                              {/* 私密文件标签 */}
                               {file.isPrivate && (
                                 <Tag color="red" icon={<LockOutlined />}>
                                   私密
@@ -808,9 +850,33 @@ const FileManager: React.FC<FileManagerProps> = () => {
                               type="link"
                               danger
                               icon={<DeleteOutlined />}
-                              onClick={() => handleDelete(file.name)}
+                              onClick={(e: React.MouseEvent) => {
+                                // 彻底阻止事件传播
+                                e.stopPropagation();
+                                e.preventDefault();
+                                
+                                // 如果是原生事件，也阻止
+                                if (e.nativeEvent) {
+                                  e.nativeEvent.stopImmediatePropagation();
+                                  e.nativeEvent.stopPropagation();
+                                }
+                                
+                                console.log('🔴 React删除事件:', file.name);
+                                handleDelete(file.name);
+                              }}
                               title="删除"
                               disabled={!!downloading}
+                              style={{ 
+                                outline: 'none',
+                                flex: 1
+                              }}
+                              onFocus={(e) => {
+                                e.currentTarget.style.outline = '2px solid #ff4d4f';
+                                e.currentTarget.style.outlineOffset = '1px';
+                              }}
+                              onBlur={(e) => {
+                                e.currentTarget.style.outline = 'none';
+                              }}
                             >
                               删除
                             </Button>
