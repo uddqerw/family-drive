@@ -1,9 +1,11 @@
 package websocket
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -37,6 +39,10 @@ func NewHub() *Hub {
 	}
 }
 
+func (h *Hub) Broadcast(message []byte) {
+	h.broadcast <- message
+}
+
 func (h *Hub) Run() {
 	for {
 		select {
@@ -56,13 +62,21 @@ func (h *Hub) Run() {
 			log.Println("客户端断开连接")
 
 		case message := <-h.broadcast:
+			/*广播消息到所有客户端*/
+
+			h.mutex.RLock()
+			clientCount := len(h.clients)
+			h.mutex.RUnlock()
+
+			fmt.Printf("🎯 [%s] 实际广播给 %d 个客户端\n", time.Now().Format("15:04:05"), clientCount)
 			h.mutex.RLock()
 			for client := range h.clients {
 				select {
 				case client.send <- message:
 				default:
-					close(client.send)
-					delete(h.clients, client)
+					go func(c *Client) {
+						h.unregister <- c // ✅ 使用通道安全删除
+					}(client)
 				}
 			}
 			h.mutex.RUnlock()

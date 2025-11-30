@@ -2,12 +2,12 @@ import axios from 'axios';
 
 // 创建axios实例
 const api = axios.create({
-  baseURL: 'https://localhost:8000', // 后端基础URL
+  baseURL: 'https://localhost:8000/api', // ✅ 添加 /api
   timeout: 10000, // 10秒超时
 });
 
 export const API_CONFIG = {
-  baseURL: 'https://localhost:8000',  // 后端是 HTTPS
+  baseURL: 'https://localhost:8000/api',  // ✅ 添加 /api
   timeout: 10000,
 };
 
@@ -64,45 +64,45 @@ api.interceptors.response.use(
 export const fileAPI = {
   // 上传文件
   upload: (formData: FormData, config?: any) => 
-    api.post('/api/files/upload', formData, config),
+    api.post('/files/upload', formData, config),  // ✅ 去掉 /api 前缀
   
   // 获取文件列表
-  list: () => api.get('/api/files/list'),
+  list: () => api.get('/files/list'),  // ✅ 去掉 /api 前缀
   
   // 下载文件
   download: (filename: string) => 
-    api.get(`/api/files/download/${filename}`, { 
+    api.get(`/files/download/${filename}`, {   // ✅ 去掉 /api 前缀
       responseType: 'blob',
       timeout: 30000 // 下载大文件需要更长时间
     }),
   
   // 删除文件
   delete: (filename: string) => 
-    api.delete(`/api/files/delete/${filename}`),
+    api.delete(`/files/delete/${filename}`),  // ✅ 去掉 /api 前缀
 };
 
 // 认证相关API
 export const authAPI = {
   // 用户登录
   login: (email: string, password: string) => 
-    api.post('/api/auth/login', { email, password }),
+    api.post('/auth/login', { email, password }),  // ✅ 去掉 /api 前缀
   
   // 用户注册
   register: (username: string, email: string, password: string) => 
-    api.post('/api/auth/register', { username, email, password }),
+    api.post('/auth/register', { username, email, password }),  // ✅ 去掉 /api 前缀
   
   // 刷新Token
   refresh: (refreshToken: string) => 
-    api.post('/api/auth/refresh', { refresh_token: refreshToken }),
+    api.post('/auth/refresh', { refresh_token: refreshToken }),  // ✅ 去掉 /api 前缀
   
   // 获取当前用户信息
-  getMe: () => api.get('/api/auth/me'),
+  getMe: () => api.get('/auth/me'),  // ✅ 去掉 /api 前缀
   
   // 用户登出
-  logout: () => api.post('/api/auth/logout'),
+  logout: () => api.post('/auth/logout'),  // ✅ 去掉 /api 前缀
   
   // 健康检查
-  healthCheck: () => api.get('/api/auth/me').catch(() => {
+  healthCheck: () => api.get('/auth/me').catch(() => {
     // 如果认证检查失败，尝试基础健康检查
     return api.get('/');
   }),
@@ -127,7 +127,7 @@ export const testAPIConnection = async () => {
 
   try {
     // 测试认证API
-    await api.get('/api/auth/me').catch(() => {}); // 即使401也算连接成功
+    await api.get('/auth/me').catch(() => {}); // 即使401也算连接成功
     results.auth = true;
     console.log('✅ 认证API连接正常');
   } catch (error) {
@@ -136,7 +136,7 @@ export const testAPIConnection = async () => {
 
   try {
     // 测试文件API
-    await api.get('/api/files/list');
+    await api.get('/files/list');
     results.files = true;
     console.log('✅ 文件API连接正常');
   } catch (error) {

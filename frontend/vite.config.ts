@@ -1,7 +1,8 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import fs from 'fs'
+import path from 'path'
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
@@ -14,9 +15,14 @@ export default defineConfig(async () => ({
   clearScreen: false,
   // 2. tauri expects a fixed port, fail if that port is not available
   server: {
-    port: 3000,
+    port: 3001,
     strictPort: true,
     host: '0.0.0.0',
+    // HTTPS 配置
+    https: {
+      key: fs.readFileSync(path.resolve(__dirname, 'frontend-key.pem')),
+      cert: fs.readFileSync(path.resolve(__dirname, 'frontend-cert.pem'))
+    },
     hmr: host
       ? {
           protocol: "ws",
